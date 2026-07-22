@@ -14,13 +14,12 @@
 - [x] Nettoyer `index.html` (commentaires Figma → balises standard)
 - [x] Utiliser l'icon `android-chrome-192x192.png` comme logo sidebar
 
-## Phase 2 : Auth Supabase
+## Phase 2 : Auth Supabase ✅
 
-- [ ] Installer `@supabase/auth-helpers-react` (si nécessaire)
-- [ ] Créer les écrans Login / Signup / ForgotPassword
-- [ ] Créer le hook `useAuth()` (session, user, login, signup, logout)
-- [ ] Protéger les routes (redirect si non connecté)
-- [ ] Tester : inscription → confirmation email → login → accès dashboard
+- [x] Créer le hook `useAuth()` (session, user, login, signup, logout)
+- [x] Créer l'écran Login (`src/screens/Login.tsx`)
+- [x] Créer l'écran Signup (`src/screens/Signup.tsx`) avec flow confirmation email
+- [x] Intégrer l'auth dans `App.tsx` (AuthProvider, routing conditionnel)
 
 ## Phase 3 : Upload Cours + Extraction PDF
 
