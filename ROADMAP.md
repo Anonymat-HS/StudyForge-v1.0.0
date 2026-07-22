@@ -23,12 +23,11 @@
 - [x] Ajouter la mention "H.S Company" dans le footer Landing
 - [x] Ajouter le système de citations inspirantes (Dashboard, citation aléatoire au chargement)
 
-## Phase 3 : Upload Cours + Extraction PDF
+## Phase 3 : Upload Cours + Extraction PDF ✅
 
-- [ ] Implémenter l'Edge Function `extract-course` (Deno/TS)
-- [ ] Installer `pdf-parse` côté Edge Function
-- [ ] Créer la page Upload côté frontend (drag & drop + input titre)
-- [ ] Stocker le cours dans la table `courses`
+- [x] Implémenter l'Edge Function `extract-course` (Deno/TS) — extraction PDF/TXT/MD
+- [x] Connecter l'écran Upload à Supabase (upload réel + titre + error handling)
+- [x] Afficher les cours récents depuis la DB
 - [ ] Tester : uploader un PDF → texte extrait visible dans la DB
 
 ## Phase 4 : Intégration LLM (couche d'abstraction)
