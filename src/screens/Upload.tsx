@@ -14,6 +14,32 @@ import type { Course } from "../lib/types"
 
 type UploadState = "idle" | "dragover" | "processing" | "generating" | "done" | "error"
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  label: string,
+  setRetrying: (msg: string | null) => void
+): Promise<unknown> {
+  const MAX_RETRIES = 2
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const res = await fetch(url, options)
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}))
+      const errMsg: string = body.error || ""
+      const match = errMsg.match(/try again in ([\d.]+)s/)
+      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 40
+      setRetrying(`${label} — rate limit, retrying in ${waitSec}s...`)
+      await new Promise((r) => setTimeout(r, waitSec * 1000))
+      setRetrying(null)
+      continue
+    }
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error || `${label} failed`)
+    return json
+  }
+  throw new Error(`${label} failed after retries`)
+}
+
 export default function Upload({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<UploadState>("idle")
   const [progress, setProgress] = useState(0)
@@ -24,6 +50,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   const [generatedCourseId, setGeneratedCourseId] = useState<string | null>(null)
   const [quizError, setQuizError] = useState<string | null>(null)
   const [flashcardError, setFlashcardError] = useState<string | null>(null)
+  const [retryingMsg, setRetryingMsg] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<File | null>(null)
 
@@ -45,6 +72,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
     setState("generating")
     setQuizError(null)
     setFlashcardError(null)
+    setRetryingMsg(null)
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) throw new Error("Not authenticated")
@@ -56,37 +84,29 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       "Content-Type": "application/json",
     }
 
-    const results = await Promise.allSettled([
-      fetch(`${functionUrl}/generate-quiz`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ courseId, numberOfQuestions: 10 }),
-      }).then(async (res) => {
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error || "Quiz generation failed")
-        return json
-      }),
-      fetch(`${functionUrl}/generate-flashcards`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ courseId, numberOfCards: 15 }),
-      }).then(async (res) => {
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error || "Flashcard generation failed")
-        return json
-      }),
-    ])
-
-    const quizResult = results[0]
-    const flashcardResult = results[1]
-
-    if (quizResult.status === "rejected") {
-      setQuizError(quizResult.reason?.message || "Failed to generate quiz")
-    }
-    if (flashcardResult.status === "rejected") {
-      setFlashcardError(flashcardResult.reason?.message || "Failed to generate flashcards")
+    try {
+      await fetchWithRetry(
+        `${functionUrl}/generate-quiz`,
+        { method: "POST", headers, body: JSON.stringify({ courseId, numberOfQuestions: 10 }) },
+        "Quiz",
+        setRetryingMsg
+      )
+    } catch (err) {
+      setQuizError((err as Error).message)
     }
 
+    try {
+      await fetchWithRetry(
+        `${functionUrl}/generate-flashcards`,
+        { method: "POST", headers, body: JSON.stringify({ courseId, numberOfCards: 15 }) },
+        "Flashcards",
+        setRetryingMsg
+      )
+    } catch (err) {
+      setFlashcardError((err as Error).message)
+    }
+
+    setRetryingMsg(null)
     setState("done")
     fetchRecentCourses()
   }
@@ -503,6 +523,14 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 Generating flashcards...
               </span>
             </div>
+            {retryingMsg && (
+              <div className="flex items-center gap-3 mt-2">
+                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#FCD34D", borderTopColor: "transparent" }} />
+                <span className="text-xs" style={{ color: "#FCD34D" }}>
+                  {retryingMsg}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -573,6 +601,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 setGeneratedCourseId(null)
                 setQuizError(null)
                 setFlashcardError(null)
+                setRetryingMsg(null)
                 fileRef.current = null
               }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
