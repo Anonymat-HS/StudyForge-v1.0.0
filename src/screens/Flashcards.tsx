@@ -351,26 +351,25 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
       {/* Flashcard */}
       <div
-        className="cursor-pointer mb-5 select-none"
+        className="cursor-pointer mb-5 select-none w-full"
         style={{ perspective: "1200px" }}
         onClick={() => setFlipped((f) => !f)}
       >
         <div
+          className="relative w-full"
           style={{
             transformStyle: "preserve-3d",
             transition: "transform 0.55s cubic-bezier(0.4, 0, 0.2, 1)",
             transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
             minHeight: "270px",
-            position: "relative",
           }}
         >
           {/* Front */}
           <div
+            className="absolute inset-0 w-full"
             style={{
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
-              position: "absolute",
-              inset: 0,
               background: "rgba(255,255,255,0.035)",
               border: "1px solid rgba(255,255,255,0.09)",
               borderRadius: "20px",
@@ -395,12 +394,11 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
           {/* Back */}
           <div
+            className="absolute inset-0 w-full"
             style={{
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
-              position: "absolute",
-              inset: 0,
               background: "rgba(124,92,255,0.06)",
               border: "1px solid rgba(124,92,255,0.22)",
               borderRadius: "20px",
