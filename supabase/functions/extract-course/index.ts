@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { extractText } from "https://esm.sh/unpdf@0.14.1"
+import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@1.6.2"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +50,8 @@ serve(async (req) => {
     if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
       texteExtrait = new TextDecoder().decode(uint8Array)
     } else if (fileName.endsWith(".pdf")) {
-      const { text } = await extractText(new Uint8Array(arrayBuffer))
+      const pdf = await getDocumentProxy(uint8Array)
+      const { text } = await extractText(pdf, { mergePages: true })
       texteExtrait = text
     } else {
       texteExtrait = new TextDecoder().decode(uint8Array)
