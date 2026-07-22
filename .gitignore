@@ -1,1 +1,5 @@
 .env
+node_modules/
+.vite/
+dist/
+supabase/.temp/
