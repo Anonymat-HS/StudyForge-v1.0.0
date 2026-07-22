@@ -1,51 +1,117 @@
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import {
   Upload as UploadIcon,
   FileText,
   Sparkles,
   CheckCircle,
   ChevronLeft,
+  AlertCircle,
 } from "lucide-react"
+import { supabase } from "../lib/supabase/client"
+import type { Course } from "../lib/types"
 
-type UploadState = "idle" | "dragover" | "processing" | "done"
+type UploadState = "idle" | "dragover" | "processing" | "done" | "error"
 
 export default function Upload({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<UploadState>("idle")
   const [progress, setProgress] = useState(0)
   const [filename, setFilename] = useState("")
+  const [titre, setTitre] = useState("")
+  const [errorMessage, setErrorMessage] = useState("")
+  const [recentCourses, setRecentCourses] = useState<Course[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<File | null>(null)
 
-  const startProcessing = useCallback((name: string) => {
-    setFilename(name)
+  useEffect(() => {
+    fetchRecentCourses()
+  }, [])
+
+  const fetchRecentCourses = async () => {
+    const { data } = await supabase
+      .from("courses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5)
+    if (data) setRecentCourses(data)
+  }
+
+  const handleUpload = useCallback(async (file: File) => {
+    if (!titre.trim()) {
+      setErrorMessage("Please enter a course title before uploading.")
+      setState("error")
+      return
+    }
+
+    setFilename(file.name)
     setState("processing")
     setProgress(0)
+    setErrorMessage("")
 
     let p = 0
     const interval = setInterval(() => {
-      p += Math.random() * 14 + 3
-      if (p >= 100) {
-        p = 100
-        clearInterval(interval)
-        setTimeout(() => setState("done"), 300)
-      }
+      p += Math.random() * 12 + 2
+      if (p > 90) p = 90
       setProgress(Math.min(p, 100))
-    }, 380)
-  }, [])
+    }, 400)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("titre", titre.trim())
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error("Not authenticated")
+
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-course`
+
+      const res = await fetch(functionUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: formData,
+      })
+
+      const json = await res.json()
+
+      clearInterval(interval)
+
+      if (!res.ok) {
+        throw new Error(json.error || "Upload failed")
+      }
+
+      setProgress(100)
+      setTimeout(() => {
+        setState("done")
+        fetchRecentCourses()
+      }, 400)
+    } catch (err) {
+      clearInterval(interval)
+      setErrorMessage((err as Error).message)
+      setState("error")
+    }
+  }, [titre])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       const file = e.dataTransfer.files[0]
-      if (file) startProcessing(file.name)
+      if (file) {
+        fileRef.current = file
+        if (!titre.trim()) {
+          setTitre(file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "))
+        }
+        handleUpload(file)
+      }
     },
-    [startProcessing]
+    [handleUpload, titre]
   )
 
   const processingSteps = [
-    { label: "Parsing document structure", threshold: 18 },
-    { label: "Extracting key concepts and terms", threshold: 42 },
-    { label: "Generating quiz questions", threshold: 66 },
-    { label: "Creating flashcard deck", threshold: 88 },
+    { label: "Uploading document", threshold: 20 },
+    { label: "Extracting text content", threshold: 50 },
+    { label: "Saving to your library", threshold: 80 },
   ]
 
   return (
@@ -74,6 +140,32 @@ export default function Upload({ onBack }: { onBack: () => void }) {
 
       {(state === "idle" || state === "dragover") && (
         <>
+          {/* Title input */}
+          <div className="mb-4">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Course title
+            </label>
+            <input
+              type="text"
+              value={titre}
+              onChange={(e) => setTitre(e.target.value)}
+              placeholder="e.g. Introduction to Algorithms - Chapter 1-4"
+              className="w-full px-4 py-2.5 rounded-xl text-sm text-white outline-none transition-all duration-150"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "rgba(124,92,255,0.5)"
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(124,92,255,0.1)"
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"
+                e.currentTarget.style.boxShadow = "none"
+              }}
+            />
+          </div>
+
           {/* Drop zone */}
           <div
             onDragOver={(e) => {
@@ -129,8 +221,8 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                   your files
                 </p>
               </div>
-              <div className="flex gap-2 mt-1">
-                {["PDF", "DOCX", "TXT", "MD"].map((fmt) => (
+              <div className="flex gap-2 mt-1 flex-wrap justify-center">
+                {["PDF", "TXT", "MD"].map((fmt) => (
                   <span
                     key={fmt}
                     className="px-2.5 py-1 text-xs rounded-lg font-mono"
@@ -154,72 +246,66 @@ export default function Upload({ onBack }: { onBack: () => void }) {
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.md"
+              accept=".pdf,.txt,.md"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
-                if (f) startProcessing(f.name)
+                if (f) {
+                  fileRef.current = f
+                  if (!titre.trim()) {
+                    setTitre(f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "))
+                  }
+                  handleUpload(f)
+                }
               }}
             />
           </div>
 
-          {/* Recent uploads */}
-          <div className="mt-8">
-            <p
-              className="text-xs font-semibold mb-3 tracking-wider"
-              style={{ color: "rgba(255,255,255,0.3)" }}
-            >
-              RECENT UPLOADS
-            </p>
-            {[
-              {
-                name: "Algorithms_Lecture_Notes_Ch1-4.pdf",
-                size: "2.4 MB",
-                questions: 42,
-                cards: 65,
-              },
-              {
-                name: "OrganicChem_Chapter3-6.pdf",
-                size: "5.1 MB",
-                questions: 89,
-                cards: 120,
-              },
-            ].map((file) => (
-              <div
-                key={file.name}
-                className="flex items-center gap-3 p-3 rounded-xl transition-colors duration-150 cursor-pointer"
-                style={{ color: "rgba(255,255,255,0.7)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.03)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent"
-                }}
+          {/* Recent courses */}
+          {recentCourses.length > 0 && (
+            <div className="mt-8">
+              <p
+                className="text-xs font-semibold mb-3 tracking-wider"
+                style={{ color: "rgba(255,255,255,0.3)" }}
               >
-                <FileText
-                  size={15}
-                  className="shrink-0"
-                  style={{ color: "rgba(255,255,255,0.3)" }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p
-                    className="text-xs mt-0.5"
-                    style={{ color: "rgba(255,255,255,0.3)" }}
-                  >
-                    {file.size} · {file.questions} questions · {file.cards}{" "}
-                    flashcards
-                  </p>
-                </div>
-                <span
-                  className="text-xs font-semibold shrink-0"
-                  style={{ color: "#4ADE80" }}
+                RECENT COURSES
+              </p>
+              {recentCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className="flex items-center gap-3 p-3 rounded-xl transition-colors duration-150 cursor-pointer"
+                  style={{ color: "rgba(255,255,255,0.7)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.03)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent"
+                  }}
                 >
-                  Processed
-                </span>
-              </div>
-            ))}
-          </div>
+                  <FileText
+                    size={15}
+                    className="shrink-0"
+                    style={{ color: "rgba(255,255,255,0.3)" }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{course.titre}</p>
+                    <p
+                      className="text-xs mt-0.5"
+                      style={{ color: "rgba(255,255,255,0.3)" }}
+                    >
+                      {new Date(course.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span
+                    className="text-xs font-semibold shrink-0"
+                    style={{ color: "#4ADE80" }}
+                  >
+                    Ready
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -243,7 +329,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
             </div>
             <div className="min-w-0">
               <p className="font-bold text-white">
-                AI is analysing your material…
+                Processing your material...
               </p>
               <p
                 className="text-xs mt-0.5 truncate"
@@ -286,9 +372,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                   <div
                     className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all duration-300"
                     style={{
-                      background: done
-                        ? "#22C55E"
-                        : "transparent",
+                      background: done ? "#22C55E" : "transparent",
                       border: done
                         ? "1px solid #22C55E"
                         : "1px solid rgba(255,255,255,0.2)",
@@ -341,51 +425,14 @@ export default function Upload({ onBack }: { onBack: () => void }) {
             <CheckCircle size={26} style={{ color: "#4ADE80" }} />
           </div>
           <h3 className="text-xl font-black text-white mb-1.5">
-            Study materials ready!
+            Course uploaded successfully!
           </h3>
           <p
             className="text-sm mb-7 truncate max-w-xs mx-auto"
             style={{ color: "rgba(255,255,255,0.4)" }}
           >
-            {filename}
+            {titre || filename}
           </p>
-
-          <div className="grid grid-cols-2 gap-3 max-w-[240px] mx-auto mb-7">
-            <div
-              className="p-4 rounded-xl text-center"
-              style={{
-                background: "rgba(124,92,255,0.1)",
-                border: "1px solid rgba(124,92,255,0.2)",
-              }}
-            >
-              <p className="text-2xl font-black" style={{ color: "#A78BFA" }}>
-                42
-              </p>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "rgba(255,255,255,0.38)" }}
-              >
-                Quiz questions
-              </p>
-            </div>
-            <div
-              className="p-4 rounded-xl text-center"
-              style={{
-                background: "rgba(0,217,255,0.08)",
-                border: "1px solid rgba(0,217,255,0.18)",
-              }}
-            >
-              <p className="text-2xl font-black" style={{ color: "#00D9FF" }}>
-                65
-              </p>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "rgba(255,255,255,0.38)" }}
-              >
-                Flashcards
-              </p>
-            </div>
-          </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
@@ -399,13 +446,15 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 (e.currentTarget.style.background = "#7C5CFF")
               }
             >
-              Start quiz
+              Back to Dashboard
             </button>
             <button
               onClick={() => {
                 setState("idle")
                 setProgress(0)
                 setFilename("")
+                setTitre("")
+                fileRef.current = null
               }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
               style={{
@@ -424,6 +473,53 @@ export default function Upload({ onBack }: { onBack: () => void }) {
               Upload another
             </button>
           </div>
+        </div>
+      )}
+
+      {state === "error" && (
+        <div
+          className="rounded-2xl p-8 text-center"
+          style={{
+            background: "rgba(239,68,68,0.06)",
+            border: "1px solid rgba(239,68,68,0.2)",
+          }}
+        >
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{
+              background: "rgba(239,68,68,0.14)",
+              border: "1px solid rgba(239,68,68,0.28)",
+            }}
+          >
+            <AlertCircle size={26} style={{ color: "#F87171" }} />
+          </div>
+          <h3 className="text-xl font-black text-white mb-1.5">
+            Upload failed
+          </h3>
+          <p
+            className="text-sm mb-7 max-w-xs mx-auto"
+            style={{ color: "rgba(255,255,255,0.4)" }}
+          >
+            {errorMessage}
+          </p>
+
+          <button
+            onClick={() => {
+              setState("idle")
+              setProgress(0)
+              setErrorMessage("")
+            }}
+            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200"
+            style={{ background: "#7C5CFF" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "#8B6BFF")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "#7C5CFF")
+            }
+          >
+            Try again
+          </button>
         </div>
       )}
     </div>
