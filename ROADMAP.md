@@ -22,13 +22,19 @@
 - [x] Intégrer l'auth dans `App.tsx` (AuthProvider, routing conditionnel)
 - [x] Ajouter la mention "H.S Company" dans le footer Landing
 - [x] Ajouter le système de citations inspirantes (Dashboard, citation aléatoire au chargement)
+- [x] Ajouter champ "Full name" au formulaire d'inscription (stocké dans `user_metadata`)
+- [x] Augmenter la sécurité mot de passe à 8+ caractères avec indicateur de force
+- [x] Créer l'écran `CompleteProfile` pour les comptes existants sans nom
+- [x] Rediriger vers CompleteProfile si profil incomplet après connexion
 
 ## Phase 3 : Upload Cours + Extraction PDF ✅
 
 - [x] Implémenter l'Edge Function `extract-course` (Deno/TS) — extraction PDF/TXT/MD
 - [x] Connecter l'écran Upload à Supabase (upload réel + titre + error handling)
 - [x] Afficher les cours récents depuis la DB
-- [ ] Tester : uploader un PDF → texte extrait visible dans la DB
+- [x] Corriger l'import `Buffer` pour Deno (`node:buffer`)
+- [x] Remplacer `pdf-parse` par `unpdf@1.6.2` (compatible Edge Functions, pas de bug de fichier test)
+- [x] Tester : uploader un PDF → texte extrait visible dans la DB
 
 ## Phase 4 : Intégration LLM (couche d'abstraction) ✅
 
@@ -37,38 +43,57 @@
 - [x] Implémenter le provider Groq (`providers/groq.ts`)
 - [x] Implémenter le provider Ollama (`providers/ollama.ts`)
 - [x] Créer `supabase/functions/_shared/llm/index.ts` (sélection via env `LLM_PROVIDER`)
-- [ ] Tester : appeler le LLM depuis une Edge Function avec un texte exemple
+- [x] Configurer Groq comme provider actif (`.env` + secrets Supabase)
+- [x] Tester : appeler le LLM depuis une Edge Function avec un texte exemple
 
-## Phase 5 : Génération Quiz
+## Phase 5 : Génération Quiz ✅
 
-- [ ] Implémenter l'Edge Function `generate-quiz` (appel LLM → parsing JSON → insert DB)
-- [ ] Implémenter le frontend Quiz (`src/screens/Quiz.tsx`)
+- [x] Implémenter l'Edge Function `generate-quiz` (appel Groq → parsing JSON → insert DB)
+- [x] Corriger le schéma d'insert : une ligne par question (course_id, question, options, bonne_reponse, explication)
+- [x] Ajouter le filtre `user_id` pour la sécurité (bypass RLS avec service_role)
+- [x] Déployer via Dashboard Supabase
+
+## Phase 6 : Génération Flashcards ✅
+
+- [x] Implémenter l'Edge Function `generate-flashcards` (appel Groq → parsing JSON → insert DB)
+- [x] Corriger le schéma d'insert : une ligne par flashcard (course_id, recto, verso)
+- [x] Ajouter le filtre `user_id` pour la sécurité
+- [x] Déployer via Dashboard Supabase
+
+## Phase 7 : Dashboard connecté aux vraies données ✅
+
+- [x] Récupérer les vrais cours depuis Supabase (triés par date décroissante)
+- [x] Compter le nombre réel de quiz et flashcards par cours
+- [x] Afficher le vrai nom de l'utilisateur (depuis `user_metadata.full_name`)
+- [x] Salut adaptatif (Good morning/afternoon/evening)
+- [x] État de chargement pendant la récupération
+- [x] État vide avec bouton "Upload a course" si aucun cours
+
+## Phase 8 : Frontend Quiz + Flashcards
+
+- [ ] Implémenter le frontend Quiz (`src/screens/Quiz.tsx`) — récupérer les vraies questions depuis Supabase
 - [ ] Afficher les questions, gérer les réponses, calculer le score
 - [ ] Stocker la progression dans `user_progress`
-- [ ] Tester : générer un quiz à partir d'un cours → jouer le quiz → score enregistré
-
-## Phase 6 : Génération Flashcards
-
-- [ ] Implémenter l'Edge Function `generate-flashcards` (appel LLM → parsing JSON → insert DB)
-- [ ] Implémenter le frontend Flashcards (`src/screens/Flashcards.tsx`)
+- [ ] Implémenter le frontend Flashcards (`src/screens/Flashcards.tsx`) — récupérer les vraies flashcards
 - [ ] Système de flip (recto/verso) + boutons niveau (nouveau, difficile, bien, facile)
 - [ ] Stocker la progression dans `flashcard_progress`
-- [ ] Tester : générer des flashcards → les réviser → progression enregistré
+- [ ] Tester : générer un quiz → jouer le quiz → score enregistré
+- [ ] Tester : générer des flashcards → les réviser → progression enregistrée
 
-## Phase 7 : Page Progression
+## Phase 9 : Page Progression
 
 - [ ] Implémenter l'Edge Function `get-progress` (récupérer stats)
-- [ ] Implémenter le frontend Progress (`src/screens/Progress.tsx`)
+- [ ] Implémenter le frontend Progress (`src/screens/Progress.tsx`) avec vraies données
 - [ ] Stats : score moyen quiz, nombre de cours révisés, streak, temps écoulé
 - [ ] Tester : après avoir fait des quiz + flashcards → page progression affiche les bonnes stats
 
-## Phase 8 : Polish UI
+## Phase 10 : Polish UI
 
 - [x] Responsive mobile (tous les écrans : Landing, Dashboard, Upload, Quiz, Flashcards, Progress)
-- [ ] États de chargement + error handling
+- [x] États de chargement + error handling (Dashboard, Auth)
 - [ ] Dark mode cohérent (accent violet #7C5CFF)
 
-## Phase 9 : Déploiement
+## Phase 11 : Déploiement
 
 - [ ] Déployer le frontend sur Vercel (Hobby plan, gratuit)
 - [ ] Déployer les Edge Functions Supabase
