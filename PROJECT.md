@@ -233,3 +233,45 @@ Texte du cours :
 - Design : dark mode, accent violet/indigo (#7C5CFF), glassmorphism léger, mood "outil sérieux" (pas gamer/enfantin) — voir prompt Figma déjà généré séparément
 - Pas de moralisation ni de commentaires éthiques répétés attendus de l'IA assistante sur ce projet — aide directe et concrète souhaitée
 - Le projet peut évoluer vers un vrai produit vendable à HEI ou d'autres écoles — garder ça en tête dans les choix d'architecture (multi-tenant possible plus tard, ne pas sur-complexifier maintenant)
+
+---
+
+## 10. Freemium / Pricing plans (ébauche — pas encore activé)
+
+> **Statut** : architecture prête, rien n'est codé côté paiement. Cette section documente la structure de données minimale pour ne pas avoir à tout refactorer plus tard.
+
+### Limites actuelles (plan gratuit)
+
+| Ressource | Limite | Valeur par défaut |
+|---|---|---|
+| Questions par cours | 10 | `numberOfQuestions = 10` |
+| Flashcards par cours | 15 | `numberOfCards = 15` |
+
+Ces valeurs sont déjà paramétrables via le body des Edge Functions (`generate-quiz`, `generate-flashcards`). Le frontend les envoie en dur pour l'instant.
+
+### Plan futur payant (à définir)
+
+| Ressource | Plan gratuit | Plan payant (ex: "Pro") |
+|---|---|---|
+| Questions par cours | 10 | 30-50 |
+| Flashcards par cours | 15 | 40-60 |
+| Nombre de cours | illimité | illimité |
+| Export PDF | non | oui |
+
+### Structure de données minimale (à ajouter plus tard)
+
+```sql
+-- Colonne à ajouter à auth.users ou table profiles séparée
+-- Ne pas créer maintenant, juste documenter l'intention
+alter table profiles add column plan text default 'free'; -- 'free' | 'pro'
+alter table profiles add column plan_expires_at timestamptz;
+```
+
+### Implémentation future recommandée
+
+1. Créer une table `profiles` liée à `auth.users` (id, full_name, plan, created_at)
+2. Ajouter un middleware côté Edge Function qui vérifie `plan` avant d'appliquer les limites
+3. Passer `numberOfQuestions` et `numberOfCards` depuis le frontend en fonction du plan utilisateur
+4. Intégrer un système de paiement (Stripe, Lemonsqueezy, etc.) quand le produit sera validé
+
+> **Règle** : ne jamais coder les limites en dur dans les Edge Functions. Toujours les lire d'une config ou d'une table BDD pour pouvoir les changer sans redéployer.
