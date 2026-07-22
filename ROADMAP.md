@@ -8,6 +8,10 @@
 - [x] Créer les types partagés (`src/lib/types.ts`)
 - [x] Créer le schéma SQL (`supabase/schema.sql`) + RLS + indexes
 - [x] Configurer `.env` + `.env.example`
+- [x] Ajouter favicon + app icons (`.ico`, `.png`, `apple-touch-icon`, `site.webmanifest`)
+- [x] Nettoyer `vite.config.ts` (supprimer plugins Figma Make)
+- [x] Nettoyer `index.html` (commentaires Figma → balises standard)
+- [x] Utiliser l'icon `android-chrome-192x192.png` comme logo sidebar
 
 ## Phase 2 : Auth Supabase
 
@@ -48,7 +52,7 @@
 - [ ] Implémenter le frontend Flashcards (`src/screens/Flashcards.tsx`)
 - [ ] Système de flip (recto/verso) + boutons niveau (nouveau, difficile, bien, facile)
 - [ ] Stocker la progression dans `flashcard_progress`
-- [ ] Tester : générer des flashcards → les réviser → progression enregistrée
+- [ ] Tester : générer des flashcards → les réviser → progression enregistré
 
 ## Phase 7 : Page Progression
 
