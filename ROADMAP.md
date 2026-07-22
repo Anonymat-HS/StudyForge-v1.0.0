@@ -69,23 +69,24 @@
 - [x] État de chargement pendant la récupération
 - [x] État vide avec bouton "Upload a course" si aucun cours
 
-## Phase 8 : Frontend Quiz + Flashcards
+## Phase 8 : Frontend Quiz + Flashcards ✅
 
-- [ ] Implémenter le frontend Quiz (`src/screens/Quiz.tsx`) — récupérer les vraies questions depuis Supabase
-- [ ] Afficher les questions, gérer les réponses, calculer le score
-- [ ] Stocker la progression dans `user_progress`
-- [ ] Implémenter le frontend Flashcards (`src/screens/Flashcards.tsx`) — récupérer les vraies flashcards
-- [ ] Système de flip (recto/verso) + boutons niveau (nouveau, difficile, bien, facile)
-- [ ] Stocker la progression dans `flashcard_progress`
-- [ ] Tester : générer un quiz → jouer le quiz → score enregistré
-- [ ] Tester : générer des flashcards → les réviser → progression enregistrée
+- [x] Implémenter le frontend Quiz (`src/screens/Quiz.tsx`) — récupérer les vraies questions depuis Supabase
+- [x] Afficher les questions, gérer les réponses, calculer le score
+- [x] Stocker la progression dans `user_progress`
+- [x] Implémenter le frontend Flashcards (`src/screens/Flashcards.tsx`) — récupérer les vraies flashcards
+- [x] Système de flip (recto/verso) + boutons niveau (nouveau, difficile, bien, facile)
+- [x] Stocker la progression dans `flashcard_progress`
+- [x] Tester : générer un quiz → jouer le quiz → score enregistré
+- [x] Tester : générer des flashcards → les réviser → progression enregistrée
 
-## Phase 9 : Page Progression
+## Phase 9 : Page Progression ✅
 
-- [ ] Implémenter l'Edge Function `get-progress` (récupérer stats)
-- [ ] Implémenter le frontend Progress (`src/screens/Progress.tsx`) avec vraies données
-- [ ] Stats : score moyen quiz, nombre de cours révisés, streak, temps écoulé
-- [ ] Tester : après avoir fait des quiz + flashcards → page progression affiche les bonnes stats
+- [x] Implémenter le frontend Progress (`src/screens/Progress.tsx`) avec vraies données Supabase
+- [x] Stats : score moyen quiz, streak, mastered flashcards, nombre de quiz
+- [x] Graphiques : score over time (area chart), score par cours (bar chart)
+- [x] Course breakdown avec barres de progression
+- [x] Weekly activity grid (basé sur les données réelles)
 
 ## Phase 10 : Polish UI
 
