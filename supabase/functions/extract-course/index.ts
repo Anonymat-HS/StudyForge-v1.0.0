@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { Buffer } from "node:buffer"
+import { extractText } from "https://esm.sh/unpdf@0.14.1"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,11 +50,8 @@ serve(async (req) => {
     if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
       texteExtrait = new TextDecoder().decode(uint8Array)
     } else if (fileName.endsWith(".pdf")) {
-      const pdfModule = await import("https://esm.sh/pdf-parse@1.1.1")
-      const pdfParse = pdfModule.default
-      const buffer = Buffer.from(uint8Array)
-      const pdfData = await pdfParse(buffer)
-      texteExtrait = pdfData.text
+      const { text } = await extractText(new Uint8Array(arrayBuffer))
+      texteExtrait = text
     } else {
       texteExtrait = new TextDecoder().decode(uint8Array)
     }
