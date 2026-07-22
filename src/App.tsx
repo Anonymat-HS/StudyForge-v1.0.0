@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./lib/supabase/auth"
 import Landing from "./screens/Landing"
 import Login from "./screens/Login"
 import Signup from "./screens/Signup"
+import CompleteProfile from "./screens/CompleteProfile"
 import Dashboard from "./screens/Dashboard"
 import Upload from "./screens/Upload"
 import Quiz from "./screens/Quiz"
@@ -37,7 +38,7 @@ function AppContent() {
   }
 
   if (screen === "landing") {
-    return <Landing onEnter={() => setScreen(user ? "dashboard" : "login")} />
+    return <Landing onEnter={() => setScreen("dashboard")} />
   }
 
   if (!user) {
@@ -45,6 +46,12 @@ function AppContent() {
       return <Signup onSwitchToLogin={() => setAuthView("login")} />
     }
     return <Login onSwitchToSignup={() => setAuthView("signup")} />
+  }
+
+  // Check if profile is complete (has full_name in metadata)
+  const hasFullName = user.user_metadata?.full_name?.trim()
+  if (!hasFullName) {
+    return <CompleteProfile onComplete={() => {}} />
   }
 
   return (

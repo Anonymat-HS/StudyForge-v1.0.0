@@ -8,7 +8,7 @@ interface AuthState {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password: string) => Promise<{ error?: string; message?: string }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string; message?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -41,8 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message };
   };
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  const signUp = async (email: string, password: string, fullName: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
     if (error) return { error: error.message };
     return { message: "Check your email for a confirmation link." };
   };

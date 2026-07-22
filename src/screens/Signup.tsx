@@ -2,12 +2,27 @@ import { useState } from "react"
 import { Eye, EyeOff, CheckCircle } from "lucide-react"
 import { useAuth } from "../lib/supabase/auth"
 
+function getPasswordStrength(pw: string): { label: string; color: string; width: string } {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+
+  if (score <= 1) return { label: "Weak", color: "#EF4444", width: "20%" }
+  if (score <= 2) return { label: "Fair", color: "#F59E0B", width: "40%" }
+  if (score <= 3) return { label: "Good", color: "#3B82F6", width: "70%" }
+  return { label: "Strong", color: "#22C55E", width: "100%" }
+}
+
 export default function Signup({
   onSwitchToLogin,
 }: {
   onSwitchToLogin: () => void
 }) {
   const { signUp } = useAuth()
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -15,12 +30,20 @@ export default function Signup({
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
 
+  const strength = getPasswordStrength(password)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setMessage("")
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters")
+      return
+    }
+
     setLoading(true)
-    const result = await signUp(email, password)
+    const result = await signUp(email, password, fullName.trim())
     if (result.error) setError(result.error)
     if (result.message) setMessage(result.message)
     setLoading(false)
@@ -107,6 +130,32 @@ export default function Signup({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Full name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 rounded-xl text-sm text-white outline-none transition-all duration-150"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(124,92,255,0.5)"
+                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(124,92,255,0.1)"
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"
+                  e.currentTarget.style.boxShadow = "none"
+                }}
+                placeholder="John Doe"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
                 Email
               </label>
               <input
@@ -141,7 +190,7 @@ export default function Signup({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm text-white outline-none transition-all duration-150"
                   style={{
                     background: "rgba(255,255,255,0.05)",
@@ -155,7 +204,7 @@ export default function Signup({
                     e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"
                     e.currentTarget.style.boxShadow = "none"
                   }}
-                  placeholder="6+ characters"
+                  placeholder="8+ characters"
                 />
                 <button
                   type="button"
@@ -168,6 +217,16 @@ export default function Signup({
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {password.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex-1 h-1 rounded-full overflow-hidden mr-3" style={{ background: "rgba(255,255,255,0.07)" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: strength.width, background: strength.color }} />
+                    </div>
+                    <span className="text-[11px] font-medium" style={{ color: strength.color }}>{strength.label}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button

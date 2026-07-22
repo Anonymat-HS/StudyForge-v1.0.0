@@ -23,7 +23,7 @@ export default function Dashboard({
   const [courses, setCourses] = useState<CourseWithStats[]>([])
   const [loading, setLoading] = useState(true)
 
-  const displayName = user?.email?.split("@")[0] ?? "there"
+  const displayName = user?.user_metadata?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there"
 
   useEffect(() => {
     async function fetchCourses() {
