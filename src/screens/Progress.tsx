@@ -10,7 +10,51 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { Flame, Target, Brain, TrendingUp } from "lucide-react"
-import { scoreHistory, courseStats, courses } from "../data"
+import { useState, useEffect } from "react"
+import { supabase } from "../lib/supabase/client"
+import { useAuth } from "../lib/supabase/auth"
+
+interface CourseRow {
+  id: string
+  titre: string
+  created_at: string
+}
+
+interface QuizRow {
+  id: string
+  course_id: string
+}
+
+interface FlashcardRow {
+  id: string
+  course_id: string
+}
+
+interface UserProgressRow {
+  id: string
+  quiz_id: string
+  correct: boolean
+  last_reviewed: string
+}
+
+interface FlashcardProgressRow {
+  id: string
+  flashcard_id: string
+  niveau: string
+  last_reviewed: string
+}
+
+interface CourseStat {
+  id: string
+  title: string
+  color: string
+  quizCount: number
+  flashcardCount: number
+  correctCount: number
+  progress: number
+}
+
+const courseColors = ["#7C5CFF", "#00D9FF", "#F59E0B", "#22C55E", "#EC4899", "#F97316"]
 
 const CustomTooltip = ({
   active,
@@ -70,7 +114,181 @@ const BarTooltip = ({
   return null
 }
 
+function computeStreak(progressRows: UserProgressRow[]): number {
+  if (!progressRows.length) return 0
+  const days = new Set(
+    progressRows.map((r) => new Date(r.last_reviewed).toISOString().slice(0, 10))
+  )
+  const sorted = Array.from(days).sort().reverse()
+  let streak = 0
+  const now = new Date()
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    if (days.has(key)) {
+      streak++
+    } else if (i > 0) {
+      break
+    }
+  }
+  return streak
+}
+
+function computeScoreHistory(progressRows: UserProgressRow[]) {
+  const byDate: Record<string, { correct: number; total: number }> = {}
+  for (const row of progressRows) {
+    const day = new Date(row.last_reviewed).toISOString().slice(0, 10)
+    if (!byDate[day]) byDate[day] = { correct: 0, total: 0 }
+    byDate[day].total++
+    if (row.correct) byDate[day].correct++
+  }
+  const entries = Object.entries(byDate)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-12)
+  return entries.map(([date, { correct, total }]) => ({
+    date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    score: Math.round((correct / total) * 100),
+  }))
+}
+
+function computeWeeklyActivity(progressRows: UserProgressRow[]) {
+  const days: Record<string, number> = {}
+  for (const row of progressRows) {
+    const day = new Date(row.last_reviewed).toISOString().slice(0, 10)
+    days[day] = (days[day] || 0) + 1
+  }
+  const today = new Date()
+  const weeks: number[][] = []
+  for (let w = 51; w >= 0; w--) {
+    const weekDays: number[] = []
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - (w * 7 + (6 - d)))
+      const key = date.toISOString().slice(0, 10)
+      weekDays.push(days[key] || 0)
+    }
+    weeks.push(weekDays)
+  }
+  return { weeks, days }
+}
+
 export default function Progress() {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [quizzesTaken, setQuizzesTaken] = useState(0)
+  const [avgScore, setAvgScore] = useState(0)
+  const [streak, setStreak] = useState(0)
+  const [masteredCount, setMasteredCount] = useState(0)
+  const [inProgressCount, setInProgressCount] = useState(0)
+  const [scoreHistory, setScoreHistory] = useState<{ date: string; score: number }[]>([])
+  const [courseStats, setCourseStats] = useState<{ name: string; score: number }[]>([])
+  const [courseBreakdown, setCourseBreakdown] = useState<CourseStat[]>([])
+  const [weeklyActivity, setWeeklyActivity] = useState<{ weeks: number[][]; days: Record<string, number> }>({ weeks: [], days: {} })
+
+  useEffect(() => {
+    if (!user) return
+    async function fetch() {
+      const [coursesRes, progressRes, flashcardProgressRes] = await Promise.all([
+        supabase.from("courses").select("id, titre, created_at").eq("user_id", user!.id),
+        supabase.from("user_progress").select("id, quiz_id, correct, last_reviewed").eq("user_id", user!.id),
+        supabase.from("flashcard_progress").select("id, flashcard_id, niveau, last_reviewed").eq("user_id", user!.id),
+      ])
+
+      const coursesList = (coursesRes.data || []) as CourseRow[]
+      const progressRows = (progressRes.data || []) as UserProgressRow[]
+      const flashcardProgRows = (flashcardProgressRes.data || []) as FlashcardProgressRow[]
+
+      // Fetch quizzes and flashcards per course
+      const courseIds = coursesList.map((c) => c.id)
+      let allQuizzes: QuizRow[] = []
+      let allFlashcards: FlashcardRow[] = []
+      if (courseIds.length) {
+        const [quizzesRes, flashcardsRes] = await Promise.all([
+          supabase.from("quizzes").select("id, course_id").in("course_id", courseIds),
+          supabase.from("flashcards").select("id, course_id").in("course_id", courseIds),
+        ])
+        allQuizzes = (quizzesRes.data || []) as QuizRow[]
+        allFlashcards = (flashcardsRes.data || []) as FlashcardRow[]
+      }
+
+      // Stats
+      const totalTaken = progressRows.length
+      const totalCorrect = progressRows.filter((r) => r.correct).length
+      setQuizzesTaken(totalTaken)
+      setAvgScore(totalTaken ? Math.round((totalCorrect / totalTaken) * 100) : 0)
+      setStreak(computeStreak(progressRows))
+
+      // Mastered flashcards
+      const mastered = flashcardProgRows.filter((r) => r.niveau === "facile").length
+      const inProgress = flashcardProgRows.filter((r) => r.niveau !== "nouveau" && r.niveau !== "facile").length
+      setMasteredCount(mastered)
+      setInProgressCount(inProgress)
+
+      // Score history
+      setScoreHistory(computeScoreHistory(progressRows))
+
+      // Course breakdown
+      const quizByCourse: Record<string, QuizRow[]> = {}
+      const flashByCourse: Record<string, FlashcardRow[]> = {}
+      for (const q of allQuizzes) {
+        if (!quizByCourse[q.course_id]) quizByCourse[q.course_id] = []
+        quizByCourse[q.course_id].push(q)
+      }
+      for (const f of allFlashcards) {
+        if (!flashByCourse[f.course_id]) flashByCourse[f.course_id] = []
+        flashByCourse[f.course_id].push(f)
+      }
+
+      const quizIdsSet = new Set(allQuizzes.map((q) => q.id))
+      const progressByQuiz: Record<string, boolean> = {}
+      for (const p of progressRows) {
+        progressByQuiz[p.quiz_id] = p.correct
+      }
+
+      const breakdown: CourseStat[] = coursesList.map((c, i) => {
+        const cQuizzes = quizByCourse[c.id] || []
+        const cFlashcards = flashByCourse[c.id] || []
+        const correct = cQuizzes.filter((q) => progressByQuiz[q.id] === true).length
+        const total = cQuizzes.length
+        return {
+          id: c.id,
+          title: c.titre,
+          color: courseColors[i % courseColors.length],
+          quizCount: total,
+          flashcardCount: cFlashcards.length,
+          correctCount: correct,
+          progress: total ? Math.round((correct / total) * 100) : 0,
+        }
+      })
+      setCourseBreakdown(breakdown)
+
+      // Bar chart: score by course
+      setCourseStats(
+        breakdown
+          .filter((c) => c.quizCount > 0)
+          .map((c) => ({ name: c.title.length > 12 ? c.title.slice(0, 12) + "…" : c.title, score: c.progress }))
+      )
+
+      // Weekly activity
+      setWeeklyActivity(computeWeeklyActivity(progressRows))
+
+      setLoading(false)
+    }
+    fetch()
+  }, [user])
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-5xl mx-auto flex items-center justify-center" style={{ minHeight: "60vh" }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "#7C5CFF" }} />
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>Loading progress…</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <h1 className="text-2xl md:text-3xl font-black text-white mb-1.5">
@@ -85,31 +303,31 @@ export default function Progress() {
         {[
           {
             label: "Day Streak",
-            value: "14",
+            value: String(streak),
             icon: Flame,
             color: "#FCD34D",
-            sub: "Personal best: 21",
+            sub: streak > 0 ? "Keep going!" : "Start studying today",
           },
           {
             label: "Quizzes taken",
-            value: "247",
+            value: String(quizzesTaken),
             icon: Brain,
             color: "#A78BFA",
-            sub: "34 this month",
+            sub: quizzesTaken > 0 ? `${quizzesTaken} total` : "Take your first quiz",
           },
           {
             label: "Avg score",
-            value: "84%",
+            value: quizzesTaken ? `${avgScore}%` : "—",
             icon: Target,
             color: "#4ADE80",
-            sub: "+6% vs last month",
+            sub: quizzesTaken > 0 ? "Across all courses" : "No data yet",
           },
           {
             label: "Mastered",
-            value: "1",
+            value: String(masteredCount),
             icon: TrendingUp,
             color: "#00D9FF",
-            sub: "3 in progress",
+            sub: inProgressCount > 0 ? `${inProgressCount} in progress` : "No flashcards reviewed yet",
           },
         ].map(({ label, value, icon: Icon, color, sub }) => (
           <div
@@ -143,91 +361,39 @@ export default function Progress() {
       </div>
 
       {/* Area chart */}
-      <div
-        className="p-6 rounded-2xl mb-5"
-        style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.07)",
-        }}
-      >
-        <h2 className="font-bold text-white mb-0.5">Quiz Scores Over Time</h2>
-        <p
-          className="text-xs mb-6"
-          style={{ color: "rgba(255,255,255,0.38)" }}
-        >
-          Rolling average across all courses
-        </p>
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart
-            data={scoreHistory}
-            margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
-          >
-            <defs>
-              <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#7C5CFF" stopOpacity={0.28} />
-                <stop offset="95%" stopColor="#7C5CFF" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.05)"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="date"
-              tick={{ fill: "rgba(255,255,255,0.28)", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              domain={[50, 100]}
-              tick={{ fill: "rgba(255,255,255,0.28)", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="score"
-              stroke="#7C5CFF"
-              strokeWidth={2}
-              fill="url(#scoreGrad)"
-              dot={{ fill: "#7C5CFF", r: 3, strokeWidth: 0 }}
-              activeDot={{ r: 5, fill: "#A78BFA", strokeWidth: 0 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Two-col lower section */}
-      <div className="grid md:grid-cols-2 gap-5">
-        {/* Bar chart */}
+      {scoreHistory.length > 0 && (
         <div
-          className="p-6 rounded-2xl"
+          className="p-6 rounded-2xl mb-5"
           style={{
             background: "rgba(255,255,255,0.03)",
             border: "1px solid rgba(255,255,255,0.07)",
           }}
         >
-          <h2 className="font-bold text-white mb-0.5">Score by Course</h2>
+          <h2 className="font-bold text-white mb-0.5">Quiz Scores Over Time</h2>
           <p
             className="text-xs mb-6"
             style={{ color: "rgba(255,255,255,0.38)" }}
           >
-            Average quiz score per subject
+            Rolling average across all courses
           </p>
-          <ResponsiveContainer width="100%" height={150}>
-            <BarChart
-              data={courseStats}
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart
+              data={scoreHistory}
               margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
             >
+              <defs>
+                <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#7C5CFF" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#7C5CFF" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="rgba(255,255,255,0.05)"
                 vertical={false}
               />
               <XAxis
-                dataKey="name"
+                dataKey="date"
                 tick={{ fill: "rgba(255,255,255,0.28)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
@@ -238,11 +404,67 @@ export default function Progress() {
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip content={<BarTooltip />} />
-              <Bar dataKey="score" fill="#00D9FF" radius={[4, 4, 0, 0]} opacity={0.8} />
-            </BarChart>
+              <Tooltip content={<CustomTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="score"
+                stroke="#7C5CFF"
+                strokeWidth={2}
+                fill="url(#scoreGrad)"
+                dot={{ fill: "#7C5CFF", r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: "#A78BFA", strokeWidth: 0 }}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
+      )}
+
+      {/* Two-col lower section */}
+      <div className="grid md:grid-cols-2 gap-5">
+        {/* Bar chart */}
+        {courseStats.length > 0 && (
+          <div
+            className="p-6 rounded-2xl"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.07)",
+            }}
+          >
+            <h2 className="font-bold text-white mb-0.5">Score by Course</h2>
+            <p
+              className="text-xs mb-6"
+              style={{ color: "rgba(255,255,255,0.38)" }}
+            >
+              Average quiz score per subject
+            </p>
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart
+                data={courseStats}
+                margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.05)"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: "rgba(255,255,255,0.28)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fill: "rgba(255,255,255,0.28)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<BarTooltip />} />
+                <Bar dataKey="score" fill="#00D9FF" radius={[4, 4, 0, 0]} opacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Course breakdown */}
         <div
@@ -253,106 +475,108 @@ export default function Progress() {
           }}
         >
           <h2 className="font-bold text-white mb-5">Course Breakdown</h2>
-          <div className="space-y-5">
-            {courses.map((c) => (
-              <div key={c.id}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{c.emoji}</span>
-                    <div>
-                      <span
-                        className="text-sm font-medium text-white"
-                        title={c.title}
-                      >
-                        {c.title.length > 22
-                          ? c.title.slice(0, 22) + "…"
-                          : c.title}
-                      </span>
-                      <p
-                        className="text-[11px]"
-                        style={{ color: "rgba(255,255,255,0.3)" }}
-                      >
-                        {c.totalQuestions} questions
-                      </p>
+          {courseBreakdown.length === 0 ? (
+            <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>
+              No courses yet. Upload material to get started.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              {courseBreakdown.map((c) => (
+                <div key={c.id}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <span
+                          className="text-sm font-medium text-white"
+                          title={c.title}
+                        >
+                          {c.title.length > 22
+                            ? c.title.slice(0, 22) + "…"
+                            : c.title}
+                        </span>
+                        <p
+                          className="text-[11px]"
+                          style={{ color: "rgba(255,255,255,0.3)" }}
+                        >
+                          {c.quizCount} quizzes · {c.flashcardCount} flashcards
+                        </p>
+                      </div>
                     </div>
+                    <span
+                      className="text-sm font-bold shrink-0"
+                      style={{ color: c.color }}
+                    >
+                      {c.progress}%
+                    </span>
                   </div>
-                  <span
-                    className="text-sm font-bold shrink-0"
-                    style={{ color: c.color }}
-                  >
-                    {c.progress}%
-                  </span>
-                </div>
-                <div
-                  className="h-1.5 rounded-full overflow-hidden"
-                  style={{ background: "rgba(255,255,255,0.07)" }}
-                >
                   <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${c.progress}%`,
-                      background: `linear-gradient(90deg, ${c.color}88, ${c.color})`,
-                    }}
-                  />
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.07)" }}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${c.progress}%`,
+                        background: `linear-gradient(90deg, ${c.color}88, ${c.color})`,
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Weekly activity grid */}
-      <div
-        className="mt-5 p-6 rounded-2xl"
-        style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.07)",
-        }}
-      >
-        <h2 className="font-bold text-white mb-5">Weekly Activity</h2>
-        <div className="overflow-x-auto pb-2 -mx-2 px-2">
-          <div className="flex gap-1 flex-wrap">
-          {Array.from({ length: 52 }, (_, week) =>
-            Array.from({ length: 7 }, (_, day) => {
-              const activity = Math.random()
-              const opacity =
-                activity > 0.7
-                  ? 0.9
-                  : activity > 0.5
-                  ? 0.55
-                  : activity > 0.3
-                  ? 0.28
-                  : 0.07
-              return (
-                <div
-                  key={`${week}-${day}`}
-                  className="w-3 h-3 rounded-sm"
-                  style={{
-                    background: `rgba(124,92,255,${opacity})`,
-                  }}
-                  title={`${activity > 0.3 ? Math.round(activity * 12) : 0} quizzes`}
-                />
-              )
-            })
-          )}
+      {weeklyActivity.weeks.length > 0 && (
+        <div
+          className="mt-5 p-6 rounded-2xl"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.07)",
+          }}
+        >
+          <h2 className="font-bold text-white mb-5">Weekly Activity</h2>
+          <div className="overflow-x-auto pb-2 -mx-2 px-2">
+            <div className="flex gap-1 flex-wrap">
+              {weeklyActivity.weeks.map((week, wi) =>
+                week.map((count, di) => {
+                  const opacity =
+                    count >= 8 ? 0.9 :
+                    count >= 5 ? 0.65 :
+                    count >= 2 ? 0.4 :
+                    count >= 1 ? 0.22 :
+                    0.07
+                  return (
+                    <div
+                      key={`${wi}-${di}`}
+                      className="w-3 h-3 rounded-sm"
+                      style={{ background: `rgba(124,92,255,${opacity})` }}
+                      title={`${count} quizzes`}
+                    />
+                  )
+                })
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+              Less
+            </span>
+            {[0.07, 0.22, 0.4, 0.9].map((o) => (
+              <div
+                key={o}
+                className="w-3 h-3 rounded-sm"
+                style={{ background: `rgba(124,92,255,${o})` }}
+              />
+            ))}
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+              More
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-3">
-          <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-            Less
-          </span>
-          {[0.07, 0.28, 0.55, 0.9].map((o) => (
-            <div
-              key={o}
-              className="w-3 h-3 rounded-sm"
-              style={{ background: `rgba(124,92,255,${o})` }}
-            />
-          ))}
-          <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-            More
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
