@@ -6,11 +6,13 @@ import {
   CheckCircle,
   ChevronLeft,
   AlertCircle,
+  Brain,
+  CreditCard,
 } from "lucide-react"
 import { supabase } from "../lib/supabase/client"
 import type { Course } from "../lib/types"
 
-type UploadState = "idle" | "dragover" | "processing" | "done" | "error"
+type UploadState = "idle" | "dragover" | "processing" | "generating" | "done" | "error"
 
 export default function Upload({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<UploadState>("idle")
@@ -19,6 +21,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   const [titre, setTitre] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
   const [recentCourses, setRecentCourses] = useState<Course[]>([])
+  const [generatedCourseId, setGeneratedCourseId] = useState<string | null>(null)
+  const [quizError, setQuizError] = useState<string | null>(null)
+  const [flashcardError, setFlashcardError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<File | null>(null)
 
@@ -33,6 +38,57 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       .order("created_at", { ascending: false })
       .limit(5)
     if (data) setRecentCourses(data)
+  }
+
+  const generateContent = async (courseId: string) => {
+    setGeneratedCourseId(courseId)
+    setState("generating")
+    setQuizError(null)
+    setFlashcardError(null)
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error("Not authenticated")
+
+    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+    const headers = {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      "Content-Type": "application/json",
+    }
+
+    const results = await Promise.allSettled([
+      fetch(`${functionUrl}/generate-quiz`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ courseId, numberOfQuestions: 10 }),
+      }).then(async (res) => {
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Quiz generation failed")
+        return json
+      }),
+      fetch(`${functionUrl}/generate-flashcards`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ courseId, numberOfCards: 15 }),
+      }).then(async (res) => {
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Flashcard generation failed")
+        return json
+      }),
+    ])
+
+    const quizResult = results[0]
+    const flashcardResult = results[1]
+
+    if (quizResult.status === "rejected") {
+      setQuizError(quizResult.reason?.message || "Failed to generate quiz")
+    }
+    if (flashcardResult.status === "rejected") {
+      setFlashcardError(flashcardResult.reason?.message || "Failed to generate flashcards")
+    }
+
+    setState("done")
+    fetchRecentCourses()
   }
 
   const handleUpload = useCallback(async (file: File) => {
@@ -82,10 +138,11 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       }
 
       setProgress(100)
-      setTimeout(() => {
-        setState("done")
-        fetchRecentCourses()
-      }, 400)
+
+      const courseId = json.course?.id
+      if (!courseId) throw new Error("No course ID returned")
+
+      await generateContent(courseId)
     } catch (err) {
       clearInterval(interval)
       setErrorMessage((err as Error).message)
@@ -407,6 +464,49 @@ export default function Upload({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {state === "generating" && (
+        <div
+          className="rounded-2xl p-8"
+          style={{
+            background: "rgba(0,217,255,0.04)",
+            border: "1px solid rgba(0,217,255,0.15)",
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{
+                background: "rgba(0,217,255,0.12)",
+                border: "1px solid rgba(0,217,255,0.25)",
+              }}
+            >
+              <Sparkles size={17} style={{ color: "#00D9FF" }} className="animate-pulse" />
+            </div>
+            <div>
+              <p className="font-bold text-white">Generating study materials...</p>
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+                This may take a few seconds
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Brain size={16} style={{ color: "#7C5CFF" }} className="animate-pulse" />
+              <span className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+                Creating quiz questions...
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <CreditCard size={16} style={{ color: "#F59E0B" }} className="animate-pulse" />
+              <span className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+                Generating flashcards...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {state === "done" && (
         <div
           className="rounded-2xl p-8 text-center"
@@ -425,14 +525,30 @@ export default function Upload({ onBack }: { onBack: () => void }) {
             <CheckCircle size={26} style={{ color: "#4ADE80" }} />
           </div>
           <h3 className="text-xl font-black text-white mb-1.5">
-            Course uploaded successfully!
+            Course ready!
           </h3>
           <p
-            className="text-sm mb-7 truncate max-w-xs mx-auto"
+            className="text-sm mb-4 truncate max-w-xs mx-auto"
             style={{ color: "rgba(255,255,255,0.4)" }}
           >
             {titre || filename}
           </p>
+
+          {/* Generation status */}
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center justify-center gap-2">
+              <Brain size={14} style={{ color: quizError ? "#F87171" : "#4ADE80" }} />
+              <span className="text-xs" style={{ color: quizError ? "#FCA5A5" : "#86EFAC" }}>
+                {quizError ? `Quiz: ${quizError}` : "Quiz generated"}
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <CreditCard size={14} style={{ color: flashcardError ? "#F87171" : "#4ADE80" }} />
+              <span className="text-xs" style={{ color: flashcardError ? "#FCA5A5" : "#86EFAC" }}>
+                {flashcardError ? `Flashcards: ${flashcardError}` : "Flashcards generated"}
+              </span>
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
@@ -454,6 +570,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 setProgress(0)
                 setFilename("")
                 setTitre("")
+                setGeneratedCourseId(null)
+                setQuizError(null)
+                setFlashcardError(null)
                 fileRef.current = null
               }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
