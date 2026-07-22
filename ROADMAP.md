@@ -8,6 +8,7 @@
 - [x] Créer les types partagés (`src/lib/types.ts`)
 - [x] Créer le schéma SQL (`supabase/schema.sql`) + RLS + indexes
 - [x] Configurer `.env` + `.env.example`
+- [x] Connecter le client Supabase au vrai projet (URL + publishable key)
 - [x] Ajouter favicon + app icons (`.ico`, `.png`, `apple-touch-icon`, `site.webmanifest`)
 - [x] Nettoyer `vite.config.ts` (supprimer plugins Figma Make)
 - [x] Nettoyer `index.html` (commentaires Figma → balises standard)
