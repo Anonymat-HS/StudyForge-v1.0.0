@@ -226,15 +226,15 @@ export default function Dashboard({
 
       {/* Continue studying banner */}
       <div
-        className="mt-6 p-5 rounded-2xl flex items-center justify-between gap-4"
+        className="mt-6 p-4 sm:p-5 rounded-2xl flex items-center justify-between gap-3 sm:gap-4"
         style={{
           background: "rgba(124,92,255,0.07)",
           border: "1px solid rgba(124,92,255,0.18)",
         }}
       >
-        <div>
+        <div className="min-w-0">
           <p className="font-bold text-sm">Continue where you left off</p>
-          <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
             Introduction to Algorithms · Chapter 4: Trees and Graphs
           </p>
         </div>

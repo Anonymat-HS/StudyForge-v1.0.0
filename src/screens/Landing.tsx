@@ -7,7 +7,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       style={{ background: "#0F0F12" }}
     >
       {/* Nav */}
-      <nav className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <img
             src="/android-chrome-192x192.png"
@@ -74,7 +74,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-7xl mx-auto px-6 pt-16 pb-12 text-center relative">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-12 text-center relative">
         {/* Ambient glow */}
         <div
           className="absolute inset-x-0 top-0 pointer-events-none"
@@ -87,7 +87,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
 
         <div className="relative">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-8"
+          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium mb-8"
             style={{
               background: "rgba(124,92,255,0.1)",
               border: "1px solid rgba(124,92,255,0.28)",
@@ -98,7 +98,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
             AI-powered learning, reimagined
           </div>
 
-          <h1 className="text-5xl md:text-[72px] font-black leading-[1.0] tracking-tighter mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-[72px] font-black leading-[1.0] tracking-tighter mb-6">
             Upload your notes.
             <br />
             <span
@@ -263,7 +263,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
 
           {/* Floating badge */}
           <div
-            className="absolute -bottom-4 right-8 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2"
+            className="hidden sm:flex absolute -bottom-4 right-8 px-4 py-2 rounded-xl text-sm font-semibold items-center gap-2"
             style={{
               background: "rgba(0,217,255,0.1)",
               border: "1px solid rgba(0,217,255,0.25)",
@@ -278,12 +278,12 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       </section>
 
       {/* How it works */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3">
             How it works
           </h2>
-          <p className="text-lg" style={{ color: "rgba(255,255,255,0.38)" }}>
+          <p className="text-base sm:text-lg" style={{ color: "rgba(255,255,255,0.38)" }}>
             From raw notes to exam-ready in three steps
           </p>
         </div>
@@ -357,8 +357,8 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
         className="py-8"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
             {[
               { value: "10,000+", label: "Active students" },
               { value: "2.4M", label: "Flashcards reviewed" },
@@ -377,15 +377,15 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       </section>
 
       {/* CTA section */}
-      <section className="max-w-7xl mx-auto px-6 py-24 text-center">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
         <div
-          className="max-w-2xl mx-auto p-10 rounded-3xl"
+          className="max-w-2xl mx-auto p-6 sm:p-10 rounded-3xl"
           style={{
             background: "rgba(124,92,255,0.07)",
             border: "1px solid rgba(124,92,255,0.2)",
           }}
         >
-          <h2 className="text-3xl md:text-4xl font-black mb-3">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-3">
             Ready to study smarter?
           </h2>
           <p className="mb-8" style={{ color: "rgba(255,255,255,0.45)" }}>
@@ -412,7 +412,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
 
       {/* Footer */}
       <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img
               src="/android-chrome-192x192.png"
