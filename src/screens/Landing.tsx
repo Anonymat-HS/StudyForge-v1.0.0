@@ -22,22 +22,16 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
           style={{ color: "rgba(255,255,255,0.45)" }}
         >
           <a
-            href="#"
+            href="#features"
             className="hover:text-white transition-colors duration-150"
           >
             Features
           </a>
           <a
-            href="#"
+            href="#pricing"
             className="hover:text-white transition-colors duration-150"
           >
             Pricing
-          </a>
-          <a
-            href="#"
-            className="hover:text-white transition-colors duration-150"
-          >
-            Blog
           </a>
         </div>
 
@@ -278,7 +272,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       </section>
 
       {/* How it works */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <div className="text-center mb-14">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3">
             How it works
@@ -373,6 +367,34 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
+        <div
+          className="max-w-xl mx-auto p-8 sm:p-10 rounded-3xl"
+          style={{
+            background: "rgba(34,197,94,0.05)",
+            border: "1px solid rgba(34,197,94,0.15)",
+          }}
+        >
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-5"
+            style={{
+              background: "rgba(34,197,94,0.12)",
+              border: "1px solid rgba(34,197,94,0.25)",
+              color: "#4ADE80",
+            }}
+          >
+            Free during beta
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black mb-3">
+            StudyForge is free right now
+          </h2>
+          <p style={{ color: "rgba(255,255,255,0.45)" }}>
+            No credit card, no hidden fees. We're building this for students first — pricing details coming soon.
+          </p>
         </div>
       </section>
 
