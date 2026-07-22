@@ -65,8 +65,7 @@
 
 ## Phase 8 : Polish UI
 
-- [ ] Finaliser les composants UI réutilisables (`src/components/ui/`)
-- [ ] Responsive mobile
+- [x] Responsive mobile (tous les écrans : Landing, Dashboard, Upload, Quiz, Flashcards, Progress)
 - [ ] États de chargement + error handling
 - [ ] Dark mode cohérent (accent violet #7C5CFF)
 
