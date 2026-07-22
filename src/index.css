@@ -29,3 +29,40 @@ html, body {
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* Flashcard flip animation */
+.flashcard-perspective {
+  perspective: 1200px;
+}
+
+.flashcard-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flashcard-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  text-align: center;
+  border-radius: 20px;
+}
+
+.flashcard-front {
+  z-index: 2;
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+}

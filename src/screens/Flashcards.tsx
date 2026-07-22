@@ -351,34 +351,19 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
       {/* Flashcard */}
       <div
-        className="cursor-pointer mb-5 select-none w-full"
-        style={{ perspective: "1200px" }}
+        className="flashcard-perspective cursor-pointer mb-5 select-none w-full"
         onClick={() => setFlipped((f) => !f)}
       >
         <div
-          className="relative w-full"
-          style={{
-            transformStyle: "preserve-3d",
-            transition: "transform 0.55s cubic-bezier(0.4, 0, 0.2, 1)",
-            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            minHeight: "270px",
-          }}
+          className={`flashcard-inner relative w-full ${flipped ? "flipped" : ""}`}
+          style={{ minHeight: "270px" }}
         >
           {/* Front */}
           <div
-            className="absolute inset-0 w-full"
+            className="flashcard-face flashcard-front"
             style={{
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
               background: "rgba(255,255,255,0.035)",
               border: "1px solid rgba(255,255,255,0.09)",
-              borderRadius: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2.5rem",
-              textAlign: "center",
             }}
           >
             <p className="text-[11px] font-semibold tracking-widest mb-5" style={{ color: "rgba(255,255,255,0.28)" }}>
@@ -394,20 +379,10 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
           {/* Back */}
           <div
-            className="absolute inset-0 w-full"
+            className="flashcard-face flashcard-back"
             style={{
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              transform: "rotateY(180deg)",
               background: "rgba(124,92,255,0.06)",
               border: "1px solid rgba(124,92,255,0.22)",
-              borderRadius: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2.5rem",
-              textAlign: "center",
             }}
           >
             <p className="text-[11px] font-semibold tracking-widest mb-5" style={{ color: "rgba(167,139,250,0.6)" }}>
