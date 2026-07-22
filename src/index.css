@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --color-bg: #0F0F12;
+  --color-surface: rgba(255, 255, 255, 0.035);
+  --color-violet: #7C5CFF;
+  --color-violet-muted: rgba(124, 92, 255, 0.15);
+  --color-cyan: #00D9FF;
+  --color-border: rgba(255, 255, 255, 0.075);
+  --color-muted: rgba(255, 255, 255, 0.4);
+}
+
+html, body {
+  font-family: 'Inter', sans-serif;
+  background-color: #0F0F12;
+  color: #EEEEF5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar by default, show on hover/scroll */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+*::-webkit-scrollbar { width: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
