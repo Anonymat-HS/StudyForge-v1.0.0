@@ -6,7 +6,7 @@
 - [x] Installer `@supabase/supabase-js`
 - [x] Créer le client Supabase (`src/lib/supabase/client.ts`)
 - [x] Créer les types partagés (`src/lib/types.ts`)
-- [x] Créer le schéma SQL (`supabase/schema.sql`) + RLS + indexes
+- [x] Créer le schéma SQL (`supabase/schema.sql`) + RLS + indexes (complet : select/insert/update/delete sur toutes les tables)
 - [x] Configurer `.env` + `.env.example`
 - [x] Connecter le client Supabase au vrai projet (URL + publishable key)
 - [x] Ajouter favicon + app icons (`.ico`, `.png`, `apple-touch-icon`, `site.webmanifest`)
