@@ -40,6 +40,7 @@ serve(async (req) => {
       .from("courses")
       .select("texte_extrait")
       .eq("id", courseId)
+      .eq("user_id", user.id)
       .single()
 
     if (courseError || !course) {
