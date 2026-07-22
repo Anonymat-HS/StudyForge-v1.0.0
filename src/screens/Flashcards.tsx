@@ -351,21 +351,25 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
       {/* Flashcard */}
       <div
-        className="flashcard-perspective cursor-pointer mb-5 select-none w-full"
+        className="cursor-pointer mb-5 select-none w-full rounded-2xl p-8 sm:p-10 text-center transition-all duration-300"
+        style={{
+          background: flipped ? "rgba(124,92,255,0.06)" : "rgba(255,255,255,0.035)",
+          border: `1px solid ${flipped ? "rgba(124,92,255,0.22)" : "rgba(255,255,255,0.09)"}`,
+          minHeight: "270px",
+        }}
         onClick={() => setFlipped((f) => !f)}
       >
-        <div
-          className={`flashcard-inner relative w-full ${flipped ? "flipped" : ""}`}
-          style={{ minHeight: "270px" }}
-        >
-          {/* Front */}
-          <div
-            className="flashcard-face flashcard-front"
-            style={{
-              background: "rgba(255,255,255,0.035)",
-              border: "1px solid rgba(255,255,255,0.09)",
-            }}
-          >
+        {flipped ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <p className="text-[11px] font-semibold tracking-widest mb-5" style={{ color: "rgba(167,139,250,0.6)" }}>
+              ANSWER
+            </p>
+            <p className="text-base leading-relaxed" style={{ color: "rgba(255,255,255,0.8)" }}>
+              {card.verso}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full">
             <p className="text-[11px] font-semibold tracking-widest mb-5" style={{ color: "rgba(255,255,255,0.28)" }}>
               QUESTION
             </p>
@@ -376,23 +380,7 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
               Tap to reveal answer
             </p>
           </div>
-
-          {/* Back */}
-          <div
-            className="flashcard-face flashcard-back"
-            style={{
-              background: "rgba(124,92,255,0.06)",
-              border: "1px solid rgba(124,92,255,0.22)",
-            }}
-          >
-            <p className="text-[11px] font-semibold tracking-widest mb-5" style={{ color: "rgba(167,139,250,0.6)" }}>
-              ANSWER
-            </p>
-            <p className="text-base leading-relaxed" style={{ color: "rgba(255,255,255,0.8)" }}>
-              {card.verso}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
       <p className="text-center text-xs mb-5" style={{ color: "rgba(255,255,255,0.28)" }}>
