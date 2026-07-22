@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Zap, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "../lib/supabase/auth"
 
 export default function Login({

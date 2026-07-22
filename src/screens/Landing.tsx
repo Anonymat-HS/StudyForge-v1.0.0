@@ -1,4 +1,4 @@
-import { ArrowRight, Upload, Sparkles, Brain, CheckCircle, Zap } from "lucide-react"
+import { ArrowRight, Upload, Sparkles, Brain, CheckCircle } from "lucide-react"
 
 export default function Landing({ onEnter }: { onEnter: () => void }) {
   return (
@@ -9,12 +9,11 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       {/* Nav */}
       <nav className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg,#7C5CFF,#5B3FD4)" }}
-          >
-            <Zap size={15} className="text-white" />
-          </div>
+          <img
+            src="/android-chrome-192x192.png"
+            alt="StudyForge"
+            className="w-8 h-8 rounded-xl"
+          />
           <span className="font-black text-lg tracking-tight">StudyForge</span>
         </div>
 
@@ -415,12 +414,11 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
       <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg,#7C5CFF,#5B3FD4)" }}
-            >
-              <Zap size={12} className="text-white" />
-            </div>
+            <img
+              src="/android-chrome-192x192.png"
+              alt="StudyForge"
+              className="w-7 h-7 rounded-lg"
+            />
             <span className="font-black text-sm">StudyForge</span>
           </div>
           <p className="text-sm" style={{ color: "rgba(255,255,255,0.28)" }}>
