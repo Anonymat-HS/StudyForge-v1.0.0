@@ -20,6 +20,8 @@
 - [x] Créer l'écran Login (`src/screens/Login.tsx`)
 - [x] Créer l'écran Signup (`src/screens/Signup.tsx`) avec flow confirmation email
 - [x] Intégrer l'auth dans `App.tsx` (AuthProvider, routing conditionnel)
+- [x] Ajouter la mention "H.S Company" dans le footer Landing
+- [x] Ajouter le système de citations inspirantes (Dashboard, citation aléatoire au chargement)
 
 ## Phase 3 : Upload Cours + Extraction PDF
 
