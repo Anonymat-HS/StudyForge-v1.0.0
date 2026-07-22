@@ -30,13 +30,13 @@
 - [x] Afficher les cours récents depuis la DB
 - [ ] Tester : uploader un PDF → texte extrait visible dans la DB
 
-## Phase 4 : Intégration LLM (couche d'abstraction)
+## Phase 4 : Intégration LLM (couche d'abstraction) ✅
 
-- [ ] Créer `supabase/functions/_shared/llm/types.ts` (interface `LLMProvider`)
-- [ ] Implémenter le provider Gemini (`providers/gemini.ts`)
-- [ ] Implémenter le provider Groq (`providers/groq.ts`)
-- [ ] Implémenter le provider Ollama (`providers/ollama.ts`)
-- [ ] Créer `supabase/functions/_shared/llm/index.ts` (sélection via env `LLM_PROVIDER`)
+- [x] Créer `supabase/functions/_shared/llm/types.ts` (interface `LLMProvider`)
+- [x] Implémenter le provider Gemini (`providers/gemini.ts`)
+- [x] Implémenter le provider Groq (`providers/groq.ts`)
+- [x] Implémenter le provider Ollama (`providers/ollama.ts`)
+- [x] Créer `supabase/functions/_shared/llm/index.ts` (sélection via env `LLM_PROVIDER`)
 - [ ] Tester : appeler le LLM depuis une Edge Function avec un texte exemple
 
 ## Phase 5 : Génération Quiz
