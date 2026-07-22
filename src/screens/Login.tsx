@@ -49,7 +49,7 @@ export default function Login({
           }}
         >
           <h1 className="text-xl font-bold text-white mb-1">Welcome back</h1>
-          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.38)" }}>
             Sign in to continue learning
           </p>
 

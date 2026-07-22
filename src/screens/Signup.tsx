@@ -10,9 +10,9 @@ function getPasswordStrength(pw: string): { label: string; color: string; width:
   if (/[0-9]/.test(pw)) score++
   if (/[^A-Za-z0-9]/.test(pw)) score++
 
-  if (score <= 1) return { label: "Weak", color: "#EF4444", width: "20%" }
+  if (score <= 1) return { label: "Weak", color: "#F87171", width: "20%" }
   if (score <= 2) return { label: "Fair", color: "#F59E0B", width: "40%" }
-  if (score <= 3) return { label: "Good", color: "#3B82F6", width: "70%" }
+  if (score <= 3) return { label: "Good", color: "#00D9FF", width: "70%" }
   return { label: "Strong", color: "#22C55E", width: "100%" }
 }
 
@@ -110,7 +110,7 @@ export default function Signup({
           }}
         >
           <h1 className="text-xl font-bold text-white mb-1">Create your account</h1>
-          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.38)" }}>
             Start learning smarter in seconds
           </p>
 

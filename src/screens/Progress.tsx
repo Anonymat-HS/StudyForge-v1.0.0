@@ -282,8 +282,8 @@ export default function Progress() {
     return (
       <div className="p-6 md:p-8 max-w-5xl mx-auto flex items-center justify-center" style={{ minHeight: "60vh" }}>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "#7C5CFF" }} />
-          <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>Loading progress…</p>
+          <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: "#7C5CFF", borderTopColor: "transparent" }} />
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.38)" }}>Loading progress…</p>
         </div>
       </div>
     )

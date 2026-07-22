@@ -168,7 +168,7 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
         </button>
 
         <h1 className="text-xl font-bold text-white mb-1">Select a course</h1>
-        <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.4)" }}>
+        <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.38)" }}>
           Choose which flashcards to review
         </p>
 
@@ -244,8 +244,9 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
             border: "1px dashed rgba(245,158,11,0.25)",
           }}
         >
+          <BookOpen size={20} className="mx-auto mb-3" style={{ color: "rgba(245,158,11,0.5)" }} />
           <p className="font-bold text-sm text-white mb-1">No flashcards yet</p>
-          <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p className="text-xs" style={{ color: "rgba(255,255,255,0.38)" }}>
             Generate flashcards from the Dashboard first.
           </p>
         </div>
