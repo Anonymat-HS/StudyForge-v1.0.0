@@ -105,6 +105,22 @@ create policy "Users can insert quizzes for own courses"
     )
   );
 
+create policy "Users can update quizzes for own courses"
+  on quizzes for update
+  using (
+    course_id in (
+      select id from courses where user_id = auth.uid()
+    )
+  );
+
+create policy "Users can delete quizzes for own courses"
+  on quizzes for delete
+  using (
+    course_id in (
+      select id from courses where user_id = auth.uid()
+    )
+  );
+
 -- flashcards: accessible via course ownership
 create policy "Users can view flashcards for own courses"
   on flashcards for select
@@ -117,6 +133,22 @@ create policy "Users can view flashcards for own courses"
 create policy "Users can insert flashcards for own courses"
   on flashcards for insert
   with check (
+    course_id in (
+      select id from courses where user_id = auth.uid()
+    )
+  );
+
+create policy "Users can update flashcards for own courses"
+  on flashcards for update
+  using (
+    course_id in (
+      select id from courses where user_id = auth.uid()
+    )
+  );
+
+create policy "Users can delete flashcards for own courses"
+  on flashcards for delete
+  using (
     course_id in (
       select id from courses where user_id = auth.uid()
     )
