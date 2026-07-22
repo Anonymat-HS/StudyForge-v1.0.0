@@ -40,7 +40,6 @@ serve(async (req) => {
       .from("courses")
       .select("texte_extrait")
       .eq("id", courseId)
-      .eq("user_id", user.id)
       .single()
 
     if (courseError || !course) {
@@ -98,16 +97,22 @@ ${course.texte_extrait}`
     const match = content.match(/\[[\s\S]*\]/)
     if (!match) throw new Error("LLM response is not a valid JSON array")
 
-    const quizItems = JSON.parse(match[0])
+    const quizItems: Array<{
+      question: string
+      options: string[]
+      bonne_reponse: string
+      explication: string
+    }> = JSON.parse(match[0])
 
-    const { error: insertError } = await supabase
-      .from("quizzes")
-      .insert({
-        course_id: courseId,
-        user_id: user.id,
-        questions: quizItems,
-      })
+    const rows = quizItems.map((q) => ({
+      course_id: courseId,
+      question: q.question,
+      options: q.options,
+      bonne_reponse: q.bonne_reponse,
+      explication: q.explication,
+    }))
 
+    const { error: insertError } = await supabase.from("quizzes").insert(rows)
     if (insertError) throw new Error(insertError.message)
 
     return new Response(

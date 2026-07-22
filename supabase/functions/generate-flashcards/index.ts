@@ -92,19 +92,15 @@ ${course.texte_extrait}`
     const match = content.match(/\[[\s\S]*\]/)
     if (!match) throw new Error("LLM response is not a valid JSON array")
 
-    const flashcards = JSON.parse(match[0])
+    const flashcards: Array<{ recto: string; verso: string }> = JSON.parse(match[0])
 
-    const { error: insertError } = await supabase
-      .from("flashcards")
-      .insert(
-        flashcards.map((fc: { recto: string; verso: string }) => ({
-          course_id: courseId,
-          user_id: user.id,
-          recto: fc.recto,
-          verso: fc.verso,
-        }))
-      )
+    const rows = flashcards.map((fc) => ({
+      course_id: courseId,
+      recto: fc.recto,
+      verso: fc.verso,
+    }))
 
+    const { error: insertError } = await supabase.from("flashcards").insert(rows)
     if (insertError) throw new Error(insertError.message)
 
     return new Response(
