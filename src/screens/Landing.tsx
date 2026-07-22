@@ -12,7 +12,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
           <img
             src="/android-chrome-192x192.png"
             alt="StudyForge"
-            className="w-8 h-8 rounded-xl"
+            className="w-10 h-10 rounded-xl"
           />
           <span className="font-black text-lg tracking-tight">StudyForge</span>
         </div>
@@ -417,7 +417,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
             <img
               src="/android-chrome-192x192.png"
               alt="StudyForge"
-              className="w-7 h-7 rounded-lg"
+              className="w-9 h-9 rounded-lg"
             />
             <span className="font-black text-sm">StudyForge</span>
           </div>

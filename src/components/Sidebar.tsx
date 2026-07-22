@@ -60,7 +60,7 @@ export default function Sidebar({
           <img
             src="/android-chrome-192x192.png"
             alt="StudyForge"
-            className="w-8 h-8 rounded-xl shrink-0"
+            className="w-10 h-10 rounded-xl shrink-0"
           />
           <span className="font-black text-base tracking-tight text-white">
             StudyForge

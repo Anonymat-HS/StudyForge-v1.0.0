@@ -34,7 +34,7 @@ export default function Login({
           <img
             src="/android-chrome-192x192.png"
             alt="StudyForge"
-            className="w-9 h-9 rounded-xl"
+            className="w-12 h-12 rounded-xl"
           />
           <span className="font-black text-xl tracking-tight text-white">
             StudyForge
