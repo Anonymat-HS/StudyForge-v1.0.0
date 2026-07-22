@@ -1,20 +1,89 @@
-import { useState } from "react"
-import { ChevronLeft, CheckCircle, XCircle, ArrowRight, RotateCcw } from "lucide-react"
-import { quizQuestions } from "../data"
+import { useState, useEffect } from "react"
+import { ChevronLeft, CheckCircle, XCircle, ArrowRight, RotateCcw, BookOpen, Loader2 } from "lucide-react"
+import { supabase } from "../lib/supabase/client"
+import { useAuth } from "../lib/supabase/auth"
+
+interface Course {
+  id: string
+  titre: string
+  quiz_count: number
+}
+
+interface QuizQuestion {
+  id: string
+  question: string
+  options: string[]
+  bonne_reponse: string
+  explication: string | null
+}
 
 export default function Quiz({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth()
+  const [courses, setCourses] = useState<Course[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+  const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingQuiz, setLoadingQuiz] = useState(false)
+
   const [current, setCurrent] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
   const [score, setScore] = useState(0)
   const [finished, setFinished] = useState(false)
 
-  const q = quizQuestions[current]
-  const total = quizQuestions.length
+  useEffect(() => {
+    async function fetchCourses() {
+      const { data } = await supabase
+        .from("courses")
+        .select("id, titre")
+        .order("created_at", { ascending: false })
+
+      if (!data) {
+        setLoading(false)
+        return
+      }
+
+      const coursesWithCount = await Promise.all(
+        data.map(async (c) => {
+          const { count } = await supabase
+            .from("quizzes")
+            .select("id", { count: "exact", head: true })
+            .eq("course_id", c.id)
+          return { ...c, quiz_count: count ?? 0 }
+        })
+      )
+
+      setCourses(coursesWithCount)
+      setLoading(false)
+    }
+    fetchCourses()
+  }, [])
+
+  const startQuiz = async (course: Course) => {
+    setSelectedCourse(course)
+    setLoadingQuiz(true)
+
+    const { data } = await supabase
+      .from("quizzes")
+      .select("id, question, options, bonne_reponse, explication")
+      .eq("course_id", course.id)
+      .order("created_at", { ascending: true })
+
+    setQuestions(data ?? [])
+    setLoadingQuiz(false)
+    setCurrent(0)
+    setScore(0)
+    setFinished(false)
+    setSelected(null)
+  }
+
+  const q = questions[current]
+  const total = questions.length
+  const correctIndex = q ? q.options.indexOf(q.bonne_reponse) : -1
 
   const handleSelect = (idx: number) => {
     if (selected !== null) return
     setSelected(idx)
-    if (idx === q.correct) setScore((s) => s + 1)
+    if (idx === correctIndex) setScore((s) => s + 1)
   }
 
   const handleNext = () => {
@@ -33,6 +102,151 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
     setFinished(false)
   }
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-2xl mx-auto flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 size={24} className="animate-spin mx-auto mb-3" style={{ color: "#7C5CFF" }} />
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>Loading courses...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // No courses state
+  if (courses.length === 0) {
+    return (
+      <div className="p-6 md:p-8 max-w-2xl mx-auto">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm mb-6 transition-colors duration-150"
+          style={{ color: "rgba(255,255,255,0.38)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}
+        >
+          <ChevronLeft size={15} />
+          Back
+        </button>
+        <div
+          className="p-8 rounded-2xl text-center"
+          style={{
+            background: "rgba(124,92,255,0.05)",
+            border: "1px dashed rgba(124,92,255,0.25)",
+          }}
+        >
+          <BookOpen size={36} className="mx-auto mb-3" style={{ color: "rgba(124,92,255,0.5)" }} />
+          <p className="font-bold text-sm text-white mb-1">No courses yet</p>
+          <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+            Upload a course first, then generate quiz questions from it.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Course selection
+  if (!selectedCourse) {
+    return (
+      <div className="p-6 md:p-8 max-w-2xl mx-auto">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm mb-6 transition-colors duration-150"
+          style={{ color: "rgba(255,255,255,0.38)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}
+        >
+          <ChevronLeft size={15} />
+          Back
+        </button>
+
+        <h1 className="text-xl font-bold text-white mb-1">Select a course</h1>
+        <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.4)" }}>
+          Choose which course you want to quiz yourself on
+        </p>
+
+        <div className="space-y-3">
+          {courses.map((course) => (
+            <button
+              key={course.id}
+              onClick={() => startQuiz(course)}
+              className="w-full p-4 rounded-xl text-left transition-all duration-200"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.06)"
+                e.currentTarget.style.borderColor = "rgba(124,92,255,0.3)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.03)"
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-sm text-white">{course.titre}</span>
+                <span
+                  className="text-xs px-2 py-1 rounded-lg"
+                  style={{
+                    background: course.quiz_count > 0 ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
+                    color: course.quiz_count > 0 ? "#4ADE80" : "#FCD34D",
+                    border: `1px solid ${course.quiz_count > 0 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)"}`,
+                  }}
+                >
+                  {course.quiz_count} questions
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Loading quiz
+  if (loadingQuiz) {
+    return (
+      <div className="p-6 md:p-8 max-w-2xl mx-auto flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 size={24} className="animate-spin mx-auto mb-3" style={{ color: "#7C5CFF" }} />
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>Loading quiz...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // No questions for this course
+  if (questions.length === 0) {
+    return (
+      <div className="p-6 md:p-8 max-w-2xl mx-auto">
+        <button
+          onClick={() => setSelectedCourse(null)}
+          className="flex items-center gap-1.5 text-sm mb-6 transition-colors duration-150"
+          style={{ color: "rgba(255,255,255,0.38)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}
+        >
+          <ChevronLeft size={15} />
+          Back to courses
+        </button>
+        <div
+          className="p-8 rounded-2xl text-center"
+          style={{
+            background: "rgba(245,158,11,0.05)",
+            border: "1px dashed rgba(245,158,11,0.25)",
+          }}
+        >
+          <p className="font-bold text-sm text-white mb-1">No quiz questions yet</p>
+          <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+            Generate quiz questions from the Dashboard first.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Finished
   if (finished) {
     const pct = Math.round((score / total) * 100)
     const grade =
@@ -57,32 +271,23 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
           {score} correct out of {total} questions
         </p>
         <p className="text-sm mb-10" style={{ color: "rgba(255,255,255,0.28)" }}>
-          Introduction to Algorithms · Quiz complete
+          {selectedCourse?.titre} · Quiz complete
         </p>
 
-        {/* Score breakdown */}
         <div className="flex gap-3 sm:gap-4 mb-10">
           <div
             className="px-5 py-3 rounded-xl text-center"
             style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}
           >
-            <p className="text-xl font-black" style={{ color: "#4ADE80" }}>
-              {score}
-            </p>
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.38)" }}>
-              Correct
-            </p>
+            <p className="text-xl font-black" style={{ color: "#4ADE80" }}>{score}</p>
+            <p className="text-xs" style={{ color: "rgba(255,255,255,0.38)" }}>Correct</p>
           </div>
           <div
             className="px-5 py-3 rounded-xl text-center"
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}
           >
-            <p className="text-xl font-black" style={{ color: "#F87171" }}>
-              {total - score}
-            </p>
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.38)" }}>
-              Incorrect
-            </p>
+            <p className="text-xl font-black" style={{ color: "#F87171" }}>{total - score}</p>
+            <p className="text-xs" style={{ color: "rgba(255,255,255,0.38)" }}>Incorrect</p>
           </div>
         </div>
 
@@ -91,18 +296,14 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
             onClick={reset}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200"
             style={{ background: "#7C5CFF" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "#8B6BFF")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "#7C5CFF")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#8B6BFF")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#7C5CFF")}
           >
             <RotateCcw size={14} />
             Retry quiz
           </button>
           <button
-            onClick={onBack}
+            onClick={() => setSelectedCourse(null)}
             className="px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
             style={{
               border: "1px solid rgba(255,255,255,0.08)",
@@ -117,7 +318,7 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
               e.currentTarget.style.color = "rgba(255,255,255,0.6)"
             }}
           >
-            Back to Dashboard
+            Choose another course
           </button>
         </div>
       </div>
@@ -127,28 +328,20 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto">
       <button
-        onClick={onBack}
+        onClick={() => setSelectedCourse(null)}
         className="flex items-center gap-1.5 text-sm mb-6 transition-colors duration-150"
         style={{ color: "rgba(255,255,255,0.38)" }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.color = "rgba(255,255,255,0.8)")
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.color = "rgba(255,255,255,0.38)")
-        }
+        onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}
       >
         <ChevronLeft size={15} />
         Exit quiz
       </button>
 
-      {/* Header */}
       <div className="flex items-center justify-between mb-1.5">
         <div>
-          <p
-            className="text-[11px] font-semibold tracking-wider"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            INTRODUCTION TO ALGORITHMS
+          <p className="text-[11px] font-semibold tracking-wider" style={{ color: "rgba(255,255,255,0.3)" }}>
+            {selectedCourse?.titre?.toUpperCase()}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
             Question {current + 1} of {total}
@@ -166,7 +359,6 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div
         className="h-1.5 rounded-full overflow-hidden mb-8"
         style={{ background: "rgba(255,255,255,0.07)" }}
@@ -181,16 +373,14 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
         />
       </div>
 
-      {/* Question */}
       <h2 className="text-xl md:text-2xl font-bold leading-snug text-white mb-7">
         {q.question}
       </h2>
 
-      {/* Options */}
       <div className="space-y-3 mb-6">
         {q.options.map((opt, idx) => {
           const isSelected = selected === idx
-          const isCorrect = idx === q.correct
+          const isCorrect = idx === correctIndex
           const revealed = selected !== null
 
           let bg = "rgba(255,255,255,0.03)"
@@ -259,8 +449,7 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
         })}
       </div>
 
-      {/* Explanation */}
-      {selected !== null && (
+      {selected !== null && q.explication && (
         <div
           className="p-4 rounded-xl mb-6"
           style={{
@@ -268,22 +457,15 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
             border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          <p
-            className="text-[11px] font-semibold mb-1.5 tracking-wider"
-            style={{ color: "rgba(255,255,255,0.35)" }}
-          >
+          <p className="text-[11px] font-semibold mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
             EXPLANATION
           </p>
-          <p
-            className="text-sm leading-relaxed"
-            style={{ color: "rgba(255,255,255,0.65)" }}
-          >
-            {q.explanation}
+          <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
+            {q.explication}
           </p>
         </div>
       )}
 
-      {/* Next button */}
       {selected !== null && (
         <button
           onClick={handleNext}
@@ -299,10 +481,7 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
           }}
         >
           {current + 1 >= total ? "See results" : "Next question"}
-          <ArrowRight
-            size={17}
-            className="group-hover:translate-x-0.5 transition-transform"
-          />
+          <ArrowRight size={17} className="group-hover:translate-x-0.5 transition-transform" />
         </button>
       )}
     </div>
