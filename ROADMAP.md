@@ -88,11 +88,14 @@
 - [x] Course breakdown avec barres de progression
 - [x] Weekly activity grid (basé sur les données réelles)
 
-## Phase 10 : Polish UI
+## Phase 10 : Polish UI ✅
 
 - [x] Responsive mobile (tous les écrans : Landing, Dashboard, Upload, Quiz, Flashcards, Progress)
 - [x] États de chargement + error handling (Dashboard, Auth)
-- [ ] Dark mode cohérent (accent violet #7C5CFF)
+- [x] Dark mode cohérent (accent violet #7C5CFF)
+- [x] Couleurs harmonisées (spinner, password strength, subtitle opacity)
+- [x] Empty states avec icônes cohérentes (BookOpen sur tous les écrans)
+- [x] Quiz results max-width corrigé (max-w-2xl au lieu de max-w-lg)
 
 ## Phase 11 : Déploiement
 
