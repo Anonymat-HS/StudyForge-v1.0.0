@@ -6,6 +6,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+function truncateText(text: string, maxWords = 6000): string {
+  const words = text.trim().split(/\s+/)
+  if (words.length <= maxWords) return text
+  const half = Math.floor(maxWords / 2)
+  const firstPart = words.slice(0, half).join(" ")
+  const lastPart = words.slice(-half).join(" ")
+  const omitted = words.length - maxWords
+  return `${firstPart}\n\n[... ${omitted} words truncated — keeping essential introduction and conclusion ...]\n\n${lastPart}`
+}
+
+async function callGroqWithRetry(prompt: string): Promise<string> {
+  const groqKey = Deno.env.get("GROQ_API_KEY")
+  if (!groqKey) throw new Error("GROQ_API_KEY not set")
+
+  const MAX_ATTEMPTS = 3
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${groqKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 3000,
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      return data.choices?.[0]?.message?.content ?? ""
+    }
+
+    const errBody = await res.text()
+
+    if (res.status === 429 && attempt < MAX_ATTEMPTS - 1) {
+      const match = errBody.match(/try again in ([\d.]+)s/)
+      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 30
+      await new Promise((r) => setTimeout(r, waitSec * 1000))
+      continue
+    }
+
+    throw new Error(`Groq API error: ${res.status} - ${errBody}`)
+  }
+
+  throw new Error("Groq API error: max retries exceeded")
+}
+
+function buildPrompt(texte: string, n: number): string {
+  const truncated = truncateText(texte)
+  return `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${n} flashcards (recto = question/concept court, verso = réponse/définition claire).
+
+Règles :
+- Recto court et précis (une question ou un terme clé)
+- Verso concis mais complet (pas de blabla)
+- Réponds UNIQUEMENT en JSON valide, sans texte avant/après, format :
+[
+  { "recto": "...", "verso": "..." }
+]
+
+Texte du cours :
+${truncated}`
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -50,44 +118,8 @@ serve(async (req) => {
       )
     }
 
-    const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    const groqKey = Deno.env.get("GROQ_API_KEY")
-    if (!groqKey) throw new Error("GROQ_API_KEY not set")
-
-    const prompt = `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${numberOfCards} flashcards (recto = question/concept court, verso = réponse/définition claire).
-
-Règles :
-- Recto court et précis (une question ou un terme clé)
-- Verso concis mais complet (pas de blabla)
-- Réponds UNIQUEMENT en JSON valide, sans texte avant/après, format :
-[
-  { "recto": "...", "verso": "..." }
-]
-
-Texte du cours :
-${course.texte_extrait}`
-
-    const llmRes = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${groqKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 8192,
-      }),
-    })
-
-    if (!llmRes.ok) {
-      const err = await llmRes.text()
-      throw new Error(`Groq API error: ${llmRes.status} - ${err}`)
-    }
-
-    const llmData = await llmRes.json()
-    const content: string = llmData.choices?.[0]?.message?.content ?? ""
+    const prompt = buildPrompt(course.texte_extrait, numberOfCards)
+    const content = await callGroqWithRetry(prompt)
 
     const match = content.match(/\[[\s\S]*\]/)
     if (!match) throw new Error("LLM response is not a valid JSON array")
@@ -108,9 +140,14 @@ ${course.texte_extrait}`
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (err) {
+    const message = (err as Error).message
+    const isRateLimit = message.includes("429") || message.includes("rate limit")
     return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: message }),
+      {
+        status: isRateLimit ? 429 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     )
   }
 })

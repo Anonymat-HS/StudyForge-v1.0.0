@@ -2,6 +2,16 @@ import type { LLMProvider, QuizOptions, FlashcardOptions, GeneratedQuizItem, Gen
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+function truncateText(text: string, maxWords = 6000): string {
+  const words = text.trim().split(/\s+/)
+  if (words.length <= maxWords) return text
+  const half = Math.floor(maxWords / 2)
+  const firstPart = words.slice(0, half).join(" ")
+  const lastPart = words.slice(-half).join(" ")
+  const omitted = words.length - maxWords
+  return `${firstPart}\n\n[... ${omitted} words truncated — keeping essential introduction and conclusion ...]\n\n${lastPart}`
+}
+
 function getApiKey(): string {
   const key = Deno.env.get("GROQ_API_KEY")
   if (!key) throw new Error("GROQ_API_KEY not set")
@@ -9,27 +19,40 @@ function getApiKey(): string {
 }
 
 async function callGroq(prompt: string): Promise<string> {
-  const res = await fetch(GROQ_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getApiKey()}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 8192,
-    }),
-  })
+  const MAX_ATTEMPTS = 3
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getApiKey()}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 3000,
+      }),
+    })
 
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Groq API error: ${res.status} - ${err}`)
+    if (res.ok) {
+      const data = await res.json()
+      return data.choices?.[0]?.message?.content ?? ""
+    }
+
+    const errBody = await res.text()
+
+    if (res.status === 429 && attempt < MAX_ATTEMPTS - 1) {
+      const match = errBody.match(/try again in ([\d.]+)s/)
+      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 30
+      await new Promise((r) => setTimeout(r, waitSec * 1000))
+      continue
+    }
+
+    throw new Error(`Groq API error: ${res.status} - ${errBody}`)
   }
 
-  const data = await res.json()
-  return data.choices?.[0]?.message?.content ?? ""
+  throw new Error("Groq API error: max retries exceeded")
 }
 
 function parseJsonArray<T>(text: string): T[] {
@@ -38,7 +61,9 @@ function parseJsonArray<T>(text: string): T[] {
   return JSON.parse(match[0]) as T[]
 }
 
-const QUIZ_PROMPT = (n: number, text: string) => `Tu es un générateur de quiz pédagogique. À partir du texte de cours suivant, génère ${n} questions à choix multiples (QCM).
+const QUIZ_PROMPT = (n: number, text: string) => {
+  const truncated = truncateText(text)
+  return `Tu es un générateur de quiz pédagogique. À partir du texte de cours suivant, génère ${n} questions à choix multiples (QCM).
 
 Règles :
 - Chaque question doit tester la compréhension, pas juste la mémorisation pure
@@ -55,9 +80,12 @@ Règles :
 ]
 
 Texte du cours :
-${text}`
+${truncated}`
+}
 
-const FLASHCARD_PROMPT = (n: number, text: string) => `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${n} flashcards (recto = question/concept court, verso = réponse/définition claire).
+const FLASHCARD_PROMPT = (n: number, text: string) => {
+  const truncated = truncateText(text)
+  return `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${n} flashcards (recto = question/concept court, verso = réponse/définition claire).
 
 Règles :
 - Recto court et précis (une question ou un terme clé)
@@ -68,7 +96,8 @@ Règles :
 ]
 
 Texte du cours :
-${text}`
+${truncated}`
+}
 
 export const groqProvider: LLMProvider = {
   async generateQuiz(courseText: string, options?: QuizOptions): Promise<GeneratedQuizItem[]> {

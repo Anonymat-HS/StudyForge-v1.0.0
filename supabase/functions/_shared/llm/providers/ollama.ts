@@ -1,5 +1,15 @@
 import type { LLMProvider, QuizOptions, FlashcardOptions, GeneratedQuizItem, GeneratedFlashcard } from "../types"
 
+function truncateText(text: string, maxWords = 6000): string {
+  const words = text.trim().split(/\s+/)
+  if (words.length <= maxWords) return text
+  const half = Math.floor(maxWords / 2)
+  const firstPart = words.slice(0, half).join(" ")
+  const lastPart = words.slice(-half).join(" ")
+  const omitted = words.length - maxWords
+  return `${firstPart}\n\n[... ${omitted} words truncated — keeping essential introduction and conclusion ...]\n\n${lastPart}`
+}
+
 function getOllamaUrl(): string {
   return Deno.env.get("OLLAMA_URL") ?? "http://localhost:11434"
 }
@@ -14,7 +24,7 @@ async function callOllama(prompt: string): Promise<string> {
       stream: false,
       options: {
         temperature: 0.7,
-        num_predict: 8192,
+        num_predict: 3000,
       },
     }),
   })
@@ -34,7 +44,9 @@ function parseJsonArray<T>(text: string): T[] {
   return JSON.parse(match[0]) as T[]
 }
 
-const QUIZ_PROMPT = (n: number, text: string) => `Tu es un générateur de quiz pédagogique. À partir du texte de cours suivant, génère ${n} questions à choix multiples (QCM).
+const QUIZ_PROMPT = (n: number, text: string) => {
+  const truncated = truncateText(text)
+  return `Tu es un générateur de quiz pédagogique. À partir du texte de cours suivant, génère ${n} questions à choix multiples (QCM).
 
 Règles :
 - Chaque question doit tester la compréhension, pas juste la mémorisation pure
@@ -51,9 +63,12 @@ Règles :
 ]
 
 Texte du cours :
-${text}`
+${truncated}`
+}
 
-const FLASHCARD_PROMPT = (n: number, text: string) => `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${n} flashcards (recto = question/concept court, verso = réponse/définition claire).
+const FLASHCARD_PROMPT = (n: number, text: string) => {
+  const truncated = truncateText(text)
+  return `Tu es un générateur de flashcards de révision. À partir du texte de cours suivant, génère ${n} flashcards (recto = question/concept court, verso = réponse/définition claire).
 
 Règles :
 - Recto court et précis (une question ou un terme clé)
@@ -64,7 +79,8 @@ Règles :
 ]
 
 Texte du cours :
-${text}`
+${truncated}`
+}
 
 export const ollamaProvider: LLMProvider = {
   async generateQuiz(courseText: string, options?: QuizOptions): Promise<GeneratedQuizItem[]> {

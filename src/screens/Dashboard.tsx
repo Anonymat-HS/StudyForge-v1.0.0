@@ -1,9 +1,10 @@
-import { Upload, Brain, CreditCard, Clock, Flame, ArrowRight, Quote, BookOpen } from "lucide-react"
+import { Upload, Brain, CreditCard, Clock, Flame, ArrowRight, Quote, BookOpen, AlertCircle, RefreshCw } from "lucide-react"
 import { getRandomQuote } from "../data/quotes"
 import type { Screen } from "../App"
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase/client"
 import { useAuth } from "../lib/supabase/auth"
+import { callGenerateFunction } from "../lib/supabase/functions"
 
 interface CourseWithStats {
   id: string
@@ -22,47 +23,68 @@ export default function Dashboard({
   const [quote] = useState(() => getRandomQuote())
   const [courses, setCourses] = useState<CourseWithStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [retryingCourse, setRetryingCourse] = useState<{ id: string; type: "quiz" | "flashcard" } | null>(null)
+  const [retryError, setRetryError] = useState<string | null>(null)
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there"
 
-  useEffect(() => {
-    async function fetchCourses() {
-      const { data: coursesData, error } = await supabase
-        .from("courses")
-        .select("id, titre, created_at")
-        .order("created_at", { ascending: false })
+  const fetchCourses = async () => {
+    setLoading(true)
+    const { data: coursesData, error } = await supabase
+      .from("courses")
+      .select("id, titre, created_at")
+      .order("created_at", { ascending: false })
 
-      if (error || !coursesData) {
-        setLoading(false)
-        return
-      }
-
-      const coursesWithStats = await Promise.all(
-        coursesData.map(async (course) => {
-          const [quizzes, flashcards] = await Promise.all([
-            supabase
-              .from("quizzes")
-              .select("id", { count: "exact", head: true })
-              .eq("course_id", course.id),
-            supabase
-              .from("flashcards")
-              .select("id", { count: "exact", head: true })
-              .eq("course_id", course.id),
-          ])
-          return {
-            ...course,
-            quiz_count: quizzes.count ?? 0,
-            flashcard_count: flashcards.count ?? 0,
-          }
-        })
-      )
-
-      setCourses(coursesWithStats)
+    if (error || !coursesData) {
       setLoading(false)
+      return
     }
 
+    const coursesWithStats = await Promise.all(
+      coursesData.map(async (course) => {
+        const [quizzes, flashcards] = await Promise.all([
+          supabase
+            .from("quizzes")
+            .select("id", { count: "exact", head: true })
+            .eq("course_id", course.id),
+          supabase
+            .from("flashcards")
+            .select("id", { count: "exact", head: true })
+            .eq("course_id", course.id),
+        ])
+        return {
+          ...course,
+          quiz_count: quizzes.count ?? 0,
+          flashcard_count: flashcards.count ?? 0,
+        }
+      })
+    )
+
+    setCourses(coursesWithStats)
+    setLoading(false)
+  }
+
+  useEffect(() => {
     fetchCourses()
   }, [])
+
+  const handleRetry = async (courseId: string, type: "quiz" | "flashcard") => {
+    setRetryingCourse({ id: courseId, type })
+    setRetryError(null)
+
+    try {
+      if (type === "quiz") {
+        await callGenerateFunction("generate-quiz", courseId, "numberOfQuestions", 10, () => {})
+      } else {
+        await callGenerateFunction("generate-flashcards", courseId, "numberOfCards", 15, () => {})
+      }
+      await fetchCourses()
+    } catch (err) {
+      setRetryError((err as Error).message)
+    } finally {
+      setRetryingCourse(null)
+    }
+  }
 
   const totalQuizzes = courses.reduce((s, c) => s + c.quiz_count, 0)
   const totalFlashcards = courses.reduce((s, c) => s + c.flashcard_count, 0)
@@ -194,6 +216,21 @@ export default function Dashboard({
         ))}
       </div>
 
+      {/* Retry error banner */}
+      {retryError && (
+        <div
+          className="mb-4 p-3 rounded-xl flex items-center gap-2 text-sm"
+          style={{
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.2)",
+            color: "#FCA5A5",
+          }}
+        >
+          <AlertCircle size={14} className="shrink-0" />
+          {retryError}
+        </div>
+      )}
+
       {/* Empty state */}
       {courses.length === 0 ? (
         <div
@@ -226,102 +263,161 @@ export default function Dashboard({
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              {courses.map((course) => (
-                <div
-                  key={course.id}
-                  className="group p-5 rounded-2xl cursor-pointer transition-all duration-200"
-                  style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.05)"
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.03)"
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"
-                  }}
-                  onClick={() => onNavigate("quiz")}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-xl text-lg flex items-center justify-center shrink-0"
-                        style={{
-                          background: "rgba(124,92,255,0.1)",
-                          border: "1px solid rgba(124,92,255,0.2)",
-                        }}
-                      >
-                        📄
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm leading-tight text-white">
-                          {course.titre}
-                        </h3>
-                        <p
-                          className="text-xs mt-0.5"
-                          style={{ color: "rgba(255,255,255,0.38)" }}
+              {courses.map((course) => {
+                const needsQuiz = course.quiz_count === 0
+                const needsFlashcard = course.flashcard_count === 0
+                const isRetryingQuiz = retryingCourse?.id === course.id && retryingCourse?.type === "quiz"
+                const isRetryingFlashcard = retryingCourse?.id === course.id && retryingCourse?.type === "flashcard"
+
+                return (
+                  <div
+                    key={course.id}
+                    className="group p-5 rounded-2xl transition-all duration-200"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.05)"
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.03)"
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-xl text-lg flex items-center justify-center shrink-0"
+                          style={{
+                            background: "rgba(124,92,255,0.1)",
+                            border: "1px solid rgba(124,92,255,0.2)",
+                          }}
                         >
-                          {new Date(course.created_at).toLocaleDateString()}
-                        </p>
+                          📄
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-sm leading-tight text-white">
+                            {course.titre}
+                          </h3>
+                          <p
+                            className="text-xs mt-0.5"
+                            style={{ color: "rgba(255,255,255,0.38)" }}
+                          >
+                            {new Date(course.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
                     </div>
+
                     <div
-                      className="flex items-center gap-1 text-xs shrink-0"
+                      className="flex items-center gap-3 text-xs flex-wrap"
                       style={{ color: "rgba(255,255,255,0.28)" }}
                     >
-                      <Clock size={10} />
-                      {new Date(course.created_at).toLocaleDateString()}
+                      {needsQuiz && !isRetryingQuiz ? (
+                        <button
+                          onClick={() => handleRetry(course.id, "quiz")}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+                          style={{
+                            background: "rgba(239,68,68,0.1)",
+                            border: "1px solid rgba(239,68,68,0.2)",
+                            color: "#FCA5A5",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(239,68,68,0.18)"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(239,68,68,0.1)"
+                          }}
+                        >
+                          <RefreshCw size={11} />
+                          Retry quiz
+                        </button>
+                      ) : isRetryingQuiz ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,92,255,0.12)", color: "#A78BFA" }}>
+                          <div className="w-3 h-3 border border-t-transparent rounded-full animate-spin" style={{ borderColor: "#A78BFA", borderTopColor: "transparent" }} />
+                          Generating quiz...
+                        </span>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>
+                          {course.quiz_count} question{course.quiz_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
+
+                      <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+
+                      {needsFlashcard && !isRetryingFlashcard ? (
+                        <button
+                          onClick={() => handleRetry(course.id, "flashcard")}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+                          style={{
+                            background: "rgba(239,68,68,0.1)",
+                            border: "1px solid rgba(239,68,68,0.2)",
+                            color: "#FCA5A5",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(239,68,68,0.18)"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(239,68,68,0.1)"
+                          }}
+                        >
+                          <RefreshCw size={11} />
+                          Retry flashcards
+                        </button>
+                      ) : isRetryingFlashcard ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,92,255,0.12)", color: "#A78BFA" }}>
+                          <div className="w-3 h-3 border border-t-transparent rounded-full animate-spin" style={{ borderColor: "#A78BFA", borderTopColor: "transparent" }} />
+                          Generating flashcards...
+                        </span>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>
+                          {course.flashcard_count} flashcard{course.flashcard_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
                     </div>
                   </div>
-
-                  <div
-                    className="flex items-center gap-4 text-xs"
-                    style={{ color: "rgba(255,255,255,0.28)" }}
-                  >
-                    <span>{course.quiz_count} questions</span>
-                    <span>·</span>
-                    <span>{course.flashcard_count} flashcards</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
           {/* Continue studying banner */}
-          <div
-            className="mt-6 p-4 sm:p-5 rounded-2xl flex items-center justify-between gap-3 sm:gap-4"
-            style={{
-              background: "rgba(124,92,255,0.07)",
-              border: "1px solid rgba(124,92,255,0.18)",
-            }}
-          >
-            <div className="min-w-0">
-              <p className="font-bold text-sm">Continue where you left off</p>
-              <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
-                {courses[0]?.titre ?? "No courses yet"}
-              </p>
-            </div>
-            <button
-              onClick={() => onNavigate("quiz")}
-              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200"
+          {courses.some((c) => c.quiz_count > 0) && (
+            <div
+              className="mt-6 p-4 sm:p-5 rounded-2xl flex items-center justify-between gap-3 sm:gap-4"
               style={{
-                background: "rgba(124,92,255,0.2)",
-                border: "1px solid rgba(124,92,255,0.3)",
-                color: "#C4B5FD",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(124,92,255,0.3)"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(124,92,255,0.2)"
+                background: "rgba(124,92,255,0.07)",
+                border: "1px solid rgba(124,92,255,0.18)",
               }}
             >
-              Resume
-              <ArrowRight size={13} />
-            </button>
-          </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Continue where you left off</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
+                  {courses.find((c) => c.quiz_count > 0)?.titre ?? "No courses yet"}
+                </p>
+              </div>
+              <button
+                onClick={() => onNavigate("quiz")}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200"
+                style={{
+                  background: "rgba(124,92,255,0.2)",
+                  border: "1px solid rgba(124,92,255,0.3)",
+                  color: "#C4B5FD",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(124,92,255,0.3)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(124,92,255,0.2)"
+                }}
+              >
+                Resume
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          )}
         </>
       )}
 

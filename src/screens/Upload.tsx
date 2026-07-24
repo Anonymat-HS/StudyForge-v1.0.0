@@ -10,35 +10,10 @@ import {
   CreditCard,
 } from "lucide-react"
 import { supabase } from "../lib/supabase/client"
+import { callGenerateFunction } from "../lib/supabase/functions"
 import type { Course } from "../lib/types"
 
 type UploadState = "idle" | "dragover" | "processing" | "generating" | "done" | "error"
-
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  label: string,
-  setRetrying: (msg: string | null) => void
-): Promise<unknown> {
-  const MAX_RETRIES = 2
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const res = await fetch(url, options)
-    if (res.status === 429) {
-      const body = await res.json().catch(() => ({}))
-      const errMsg: string = body.error || ""
-      const match = errMsg.match(/try again in ([\d.]+)s/)
-      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 40
-      setRetrying(`${label} — rate limit, retrying in ${waitSec}s...`)
-      await new Promise((r) => setTimeout(r, waitSec * 1000))
-      setRetrying(null)
-      continue
-    }
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error || `${label} failed`)
-    return json
-  }
-  throw new Error(`${label} failed after retries`)
-}
 
 export default function Upload({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<UploadState>("idle")
@@ -74,34 +49,21 @@ export default function Upload({ onBack }: { onBack: () => void }) {
     setFlashcardError(null)
     setRetryingMsg(null)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error("Not authenticated")
-
-    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-    const headers = {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      "Content-Type": "application/json",
-    }
-
+    // Generate quiz first
     try {
-      await fetchWithRetry(
-        `${functionUrl}/generate-quiz`,
-        { method: "POST", headers, body: JSON.stringify({ courseId, numberOfQuestions: 10 }) },
-        "Quiz",
-        setRetryingMsg
-      )
+      await callGenerateFunction("generate-quiz", courseId, "numberOfQuestions", 10, setRetryingMsg)
     } catch (err) {
       setQuizError((err as Error).message)
     }
 
+    // Wait 4 seconds before generating flashcards to let rate limit cool down
+    setRetryingMsg("Pausing between generations...")
+    await new Promise((r) => setTimeout(r, 4000))
+    setRetryingMsg(null)
+
+    // Generate flashcards
     try {
-      await fetchWithRetry(
-        `${functionUrl}/generate-flashcards`,
-        { method: "POST", headers, body: JSON.stringify({ courseId, numberOfCards: 15 }) },
-        "Flashcards",
-        setRetryingMsg
-      )
+      await callGenerateFunction("generate-flashcards", courseId, "numberOfCards", 15, setRetryingMsg)
     } catch (err) {
       setFlashcardError((err as Error).message)
     }

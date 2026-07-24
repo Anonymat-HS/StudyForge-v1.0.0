@@ -275,3 +275,38 @@ alter table profiles add column plan_expires_at timestamptz;
 4. Intégrer un système de paiement (Stripe, Lemonsqueezy, etc.) quand le produit sera validé
 
 > **Règle** : ne jamais coder les limites en dur dans les Edge Functions. Toujours les lire d'une config ou d'une table BDD pour pouvoir les changer sans redéployer.
+
+---
+
+## 11. Troncature du texte pour le LLM (gestion des rate limits)
+
+### Problème
+Les PDF longs peuvent atteindre 15 000–50 000 mots. Envoyés intégralement dans le prompt, ils provoquent des **rate limits 429** sur Groq (et consomment inutilement des tokens même sur Gemini/Ollama).
+
+### Solution retenue
+Ajout d'une fonction `truncateText()` dans :
+- Les Edge Functions `generate-quiz` / `generate-flashcards`
+- Les providers `groq.ts`, `gemini.ts`, `ollama.ts`
+
+**Paramètre :** `maxWords = 6000` (≈ 8000 tokens, ratio ~1.3 token/mot pour du texte français/anglais)
+
+**Stratégie de découpage :**
+- Si le texte ≤ 6000 mots → envoyé intégralement
+- Si le texte > 6000 mots → garde les **3000 premiers mots** (introduction, concepts-clés) + **3000 derniers mots** (résumés, conclusions)
+- Insertion d'un marqueur `[... X mots tronqués — garde l'essentiel ...]` entre les deux
+
+### Justification du seuil
+- **10 QCM** avec 4 options + explication → ~2000 tokens de réponse max (avec `max_tokens: 3000`, on est large)
+- **15 flashcards** recto/verso → ~1000 tokens de réponse max
+- Le prompt (consignes + format JSON) pèse ~400 tokens
+- **Total besoin prompt + réponse :** ~8000 tokens = large pour que le LLM produise un résultat de qualité, tout en restant sous les quotas gratuits de Groq (30 req/min, 6000 tokens input/min sur le tier gratuit — ordres de grandeur à confirmer)
+- Garder le début + fin donne au LLM le contexte essentiel : définitions (début) et concepts avancés/résumés (fin)
+
+### Retry 429 amélioré
+- Les Edge Functions retentent l'appel Groq jusqu'à **3 fois**, en parsant le `try again in Xs` exact renvoyé par l'API
+- Le frontend retente aussi (3 tentatives avec `fetchWithRetry`) si l'Edge Function renvoie un 429
+- Délai **4 secondes** entre la génération quiz et flashcards dans `Upload.tsx` pour espacer les bursts
+- Les Edge Functions passent maintenant le **vrai code HTTP** (429 vs 500) au frontend, au lieu de tout transformer en 500
+
+### Boutons Retry individuels (Dashboard)
+Un cours peut avoir un quiz généré mais pas les flashcards (ou l'inverse). Le Dashboard affiche des boutons **"Retry quiz"** / **"Retry flashcards"** rouges sur les cartes de cours concernées, pour relancer UNIQUEMENT la génération manquante sans re-uploader le fichier. L'état de chargement est indiqué par un spinner violet. Un message d'erreur global s'affiche en haut si le retry échoue.
