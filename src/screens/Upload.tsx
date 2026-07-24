@@ -30,7 +30,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   const fileRef = useRef<File | null>(null)
 
   useEffect(() => {
+    let ignore = false
     fetchRecentCourses()
+    return () => { ignore = true }
   }, [])
 
   const fetchRecentCourses = async () => {

@@ -28,17 +28,13 @@ export default function Dashboard({
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there"
 
-  const fetchCourses = async () => {
-    setLoading(true)
+  const loadCourses = async () => {
     const { data: coursesData, error } = await supabase
       .from("courses")
       .select("id, titre, created_at")
       .order("created_at", { ascending: false })
 
-    if (error || !coursesData) {
-      setLoading(false)
-      return
-    }
+    if (error || !coursesData) return
 
     const coursesWithStats = await Promise.all(
       coursesData.map(async (course) => {
@@ -61,11 +57,14 @@ export default function Dashboard({
     )
 
     setCourses(coursesWithStats)
-    setLoading(false)
   }
 
   useEffect(() => {
-    fetchCourses()
+    let ignore = false
+    loadCourses().finally(() => {
+      if (!ignore) setLoading(false)
+    })
+    return () => { ignore = true }
   }, [])
 
   const handleRetry = async (courseId: string, type: "quiz" | "flashcard") => {
@@ -78,7 +77,7 @@ export default function Dashboard({
       } else {
         await callGenerateFunction("generate-flashcards", courseId, "numberOfCards", 15, () => {})
       }
-      await fetchCourses()
+      await loadCourses()
     } catch (err) {
       setRetryError((err as Error).message)
     } finally {
