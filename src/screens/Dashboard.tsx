@@ -29,29 +29,32 @@ export default function Dashboard({
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there"
 
   const loadCourses = async () => {
-    const { data: coursesData, error } = await supabase
-      .from("courses")
-      .select("id, titre, created_at")
-      .order("created_at", { ascending: false })
+    async function query<T>(fn: () => Promise<{ data: T | null; error: unknown }>): Promise<T | null> {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await fn()
+        if (!error) return data
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)))
+      }
+      return null
+    }
 
-    if (error || !coursesData) return
+    const coursesData = await query(() =>
+      supabase.from("courses").select("id, titre, created_at").order("created_at", { ascending: false })
+    )
+    if (!coursesData) return
 
     const coursesWithStats = await Promise.all(
       coursesData.map(async (course) => {
-        const [quizzes, flashcards] = await Promise.all([
-          supabase
-            .from("quizzes")
-            .select("id", { count: "exact", head: true })
-            .eq("course_id", course.id),
-          supabase
-            .from("flashcards")
-            .select("id", { count: "exact", head: true })
-            .eq("course_id", course.id),
-        ])
+        const quizzes = await query(() =>
+          supabase.from("quizzes").select("id", { count: "exact", head: true }).eq("course_id", course.id)
+        )
+        const flashcards = await query(() =>
+          supabase.from("flashcards").select("id", { count: "exact", head: true }).eq("course_id", course.id)
+        )
         return {
           ...course,
-          quiz_count: quizzes.count ?? 0,
-          flashcard_count: flashcards.count ?? 0,
+          quiz_count: quizzes?.count ?? 0,
+          flashcard_count: flashcards?.count ?? 0,
         }
       })
     )
