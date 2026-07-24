@@ -10,7 +10,9 @@ import Upload from "./screens/Upload"
 import Quiz from "./screens/Quiz"
 import Flashcards from "./screens/Flashcards"
 import Progress from "./screens/Progress"
+import Profile from "./screens/Profile"
 import Sidebar from "./components/Sidebar"
+import AvatarMenu from "./components/AvatarMenu"
 
 export type Screen =
   | "landing"
@@ -19,6 +21,7 @@ export type Screen =
   | "quiz"
   | "flashcards"
   | "progress"
+  | "profile"
 
 function AppContent() {
   const { user, loading } = useAuth()
@@ -86,6 +89,17 @@ function AppContent() {
             <Menu size={20} />
           </button>
           <span className="font-black text-base">StudyForge</span>
+          <div className="ml-auto">
+            <AvatarMenu onNavigate={setScreen} />
+          </div>
+        </div>
+
+        {/* Desktop top bar */}
+        <div
+          className="hidden lg:flex items-center justify-end px-6 py-3 shrink-0"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <AvatarMenu onNavigate={setScreen} />
         </div>
 
         <main className="flex-1 overflow-y-auto">
@@ -102,6 +116,9 @@ function AppContent() {
             <Flashcards onBack={() => setScreen("dashboard")} />
           )}
           {screen === "progress" && <Progress />}
+          {screen === "profile" && (
+            <Profile onBack={() => setScreen("dashboard")} />
+          )}
         </main>
       </div>
     </div>

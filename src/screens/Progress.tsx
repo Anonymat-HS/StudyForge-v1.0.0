@@ -33,7 +33,7 @@ interface FlashcardRow {
 interface UserProgressRow {
   id: string
   quiz_id: string
-  correct: boolean
+  correct: boolean | null
   last_reviewed: string
 }
 
@@ -114,12 +114,16 @@ const BarTooltip = ({
   return null
 }
 
-function computeStreak(progressRows: UserProgressRow[]): number {
-  if (!progressRows.length) return 0
-  const days = new Set(
-    progressRows.map((r) => new Date(r.last_reviewed).toISOString().slice(0, 10))
-  )
-  const sorted = Array.from(days).sort().reverse()
+function computeStreak(quizRows: UserProgressRow[], flashRows: FlashcardProgressRow[]): number {
+  const days = new Set<string>()
+  for (const r of quizRows) {
+    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
+  }
+  for (const r of flashRows) {
+    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
+  }
+  if (!days.size) return 0
+
   let streak = 0
   const now = new Date()
   for (let i = 0; i < 365; i++) {
@@ -136,8 +140,9 @@ function computeStreak(progressRows: UserProgressRow[]): number {
 }
 
 function computeScoreHistory(progressRows: UserProgressRow[]) {
+  const answered = progressRows.filter((r) => r.correct !== null)
   const byDate: Record<string, { correct: number; total: number }> = {}
-  for (const row of progressRows) {
+  for (const row of answered) {
     const day = new Date(row.last_reviewed).toISOString().slice(0, 10)
     if (!byDate[day]) byDate[day] = { correct: 0, total: 0 }
     byDate[day].total++
@@ -179,8 +184,7 @@ export default function Progress() {
   const [quizzesTaken, setQuizzesTaken] = useState(0)
   const [avgScore, setAvgScore] = useState(0)
   const [streak, setStreak] = useState(0)
-  const [masteredCount, setMasteredCount] = useState(0)
-  const [inProgressCount, setInProgressCount] = useState(0)
+  const [flashcardsReviewed, setFlashcardsReviewed] = useState(0)
   const [scoreHistory, setScoreHistory] = useState<{ date: string; score: number }[]>([])
   const [courseStats, setCourseStats] = useState<{ name: string; score: number }[]>([])
   const [courseBreakdown, setCourseBreakdown] = useState<CourseStat[]>([])
@@ -199,7 +203,6 @@ export default function Progress() {
       const progressRows = (progressRes.data || []) as UserProgressRow[]
       const flashcardProgRows = (flashcardProgressRes.data || []) as FlashcardProgressRow[]
 
-      // Fetch quizzes and flashcards per course
       const courseIds = coursesList.map((c) => c.id)
       let allQuizzes: QuizRow[] = []
       let allFlashcards: FlashcardRow[] = []
@@ -212,18 +215,16 @@ export default function Progress() {
         allFlashcards = (flashcardsRes.data || []) as FlashcardRow[]
       }
 
-      // Stats
-      const totalTaken = progressRows.length
-      const totalCorrect = progressRows.filter((r) => r.correct).length
+      // Stats (filter out null correct)
+      const answered = progressRows.filter((r) => r.correct !== null)
+      const totalTaken = answered.length
+      const totalCorrect = answered.filter((r) => r.correct).length
       setQuizzesTaken(totalTaken)
       setAvgScore(totalTaken ? Math.round((totalCorrect / totalTaken) * 100) : 0)
-      setStreak(computeStreak(progressRows))
+      setStreak(computeStreak(progressRows, flashcardProgRows))
 
-      // Mastered flashcards
-      const mastered = flashcardProgRows.filter((r) => r.niveau === "facile").length
-      const inProgress = flashcardProgRows.filter((r) => r.niveau !== "nouveau" && r.niveau !== "facile").length
-      setMasteredCount(mastered)
-      setInProgressCount(inProgress)
+      // Flashcards reviewed
+      setFlashcardsReviewed(flashcardProgRows.length)
 
       // Score history
       setScoreHistory(computeScoreHistory(progressRows))
@@ -243,7 +244,9 @@ export default function Progress() {
       const quizIdsSet = new Set(allQuizzes.map((q) => q.id))
       const progressByQuiz: Record<string, boolean> = {}
       for (const p of progressRows) {
-        progressByQuiz[p.quiz_id] = p.correct
+        if (p.correct !== null) {
+          progressByQuiz[p.quiz_id] = p.correct
+        }
       }
 
       const breakdown: CourseStat[] = coursesList.map((c, i) => {
@@ -263,14 +266,12 @@ export default function Progress() {
       })
       setCourseBreakdown(breakdown)
 
-      // Bar chart: score by course
       setCourseStats(
         breakdown
           .filter((c) => c.quizCount > 0)
           .map((c) => ({ name: c.title.length > 12 ? c.title.slice(0, 12) + "…" : c.title, score: c.progress }))
       )
 
-      // Weekly activity
       setWeeklyActivity(computeWeeklyActivity(progressRows))
 
       setLoading(false)
@@ -278,12 +279,38 @@ export default function Progress() {
     fetch()
   }, [user])
 
+  const hasData = quizzesTaken > 0 || flashcardsReviewed > 0
+
   if (loading) {
     return (
       <div className="p-6 md:p-8 max-w-5xl mx-auto flex items-center justify-center" style={{ minHeight: "60vh" }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: "#7C5CFF", borderTopColor: "transparent" }} />
           <p className="text-sm" style={{ color: "rgba(255,255,255,0.38)" }}>Loading progress…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!hasData) {
+    return (
+      <div className="p-6 md:p-8 max-w-5xl mx-auto">
+        <h1 className="text-2xl md:text-3xl font-black text-white mb-1.5">Progress</h1>
+        <p className="text-sm mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>
+          Your learning journey at a glance
+        </p>
+        <div
+          className="p-10 rounded-2xl text-center"
+          style={{
+            background: "rgba(124,92,255,0.05)",
+            border: "1px dashed rgba(124,92,255,0.25)",
+          }}
+        >
+          <Brain size={40} className="mx-auto mb-3" style={{ color: "rgba(124,92,255,0.4)" }} />
+          <p className="font-bold text-sm text-white mb-1">No progress yet</p>
+          <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>
+            Complete your first quiz to see your progress here.
+          </p>
         </div>
       </div>
     )
@@ -323,11 +350,11 @@ export default function Progress() {
             sub: quizzesTaken > 0 ? "Across all courses" : "No data yet",
           },
           {
-            label: "Mastered",
-            value: String(masteredCount),
+            label: "Flashcards reviewed",
+            value: String(flashcardsReviewed),
             icon: TrendingUp,
             color: "#00D9FF",
-            sub: inProgressCount > 0 ? `${inProgressCount} in progress` : "No flashcards reviewed yet",
+            sub: flashcardsReviewed > 0 ? `${flashcardsReviewed} total` : "Review your first flashcard",
           },
         ].map(({ label, value, icon: Icon, color, sub }) => (
           <div
