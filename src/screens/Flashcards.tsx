@@ -456,6 +456,7 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
             onClick={() => {
               setCurrent((c) => c - 1)
               setFlipped(false)
+              setHistory((h) => h.slice(0, -1))
             }}
             className="flex items-center gap-1 text-xs transition-colors duration-150"
             style={{ color: "rgba(255,255,255,0.25)" }}

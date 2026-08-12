@@ -78,7 +78,17 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
 
   const q = questions[current]
   const total = questions.length
-  const correctIndex = q ? q.options.indexOf(q.bonne_reponse) : -1
+  const correctIndex = (() => {
+    if (!q) return -1
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ")
+    const target = normalize(q.bonne_reponse)
+    const exact = q.options.findIndex((o) => normalize(o) === target)
+    if (exact !== -1) return exact
+    return q.options.findIndex((o) => {
+      const opt = normalize(o)
+      return target.includes(opt) || opt.includes(target)
+    })
+  })()
 
   const handleSelect = async (idx: number) => {
     if (selected !== null) return
