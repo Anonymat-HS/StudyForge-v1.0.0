@@ -11,6 +11,7 @@ interface CourseRow {
 }
 
 interface UserProgressRow {
+  quiz_id: string
   correct: boolean | null
   last_reviewed: string
 }
@@ -101,7 +102,7 @@ export default function Profile({ onBack }: { onBack: () => void }) {
     async function fetchData() {
       const [coursesRes, progressRes, flashcardProgressRes] = await Promise.all([
         supabase.from("courses").select("id, titre, created_at").eq("user_id", user!.id),
-        supabase.from("user_progress").select("correct, last_reviewed").eq("user_id", user!.id),
+        supabase.from("user_progress").select("quiz_id, correct, last_reviewed").eq("user_id", user!.id),
         supabase.from("flashcard_progress").select("niveau, last_reviewed").eq("user_id", user!.id),
       ])
 
