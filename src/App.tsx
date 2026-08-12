@@ -24,7 +24,7 @@ export type Screen =
   | "profile"
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, refreshUser } = useAuth()
   const [screen, setScreen] = useState<Screen>("landing")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authView, setAuthView] = useState<"login" | "signup">("login")
@@ -54,7 +54,7 @@ function AppContent() {
   // Check if profile is complete (has full_name in metadata)
   const hasFullName = user.user_metadata?.full_name?.trim()
   if (!hasFullName) {
-    return <CompleteProfile onComplete={() => {}} />
+    return <CompleteProfile onComplete={refreshUser} />
   }
 
   return (

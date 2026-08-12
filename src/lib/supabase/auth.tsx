@@ -10,6 +10,7 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string; message?: string }>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -20,11 +21,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      })
+      .catch(() => {
+        // Network failure: resolve to logged-out state instead of blocking forever
+        setUser(null);
+        setSession(null);
+      })
+      .finally(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -55,8 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshUser = async () => {
+    const { data } = await supabase.auth.getSession();
+    setSession(data.session);
+    setUser(data.session?.user ?? null);
+    setLoading(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
