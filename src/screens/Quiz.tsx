@@ -80,10 +80,37 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
   const total = questions.length
   const correctIndex = q ? q.options.indexOf(q.bonne_reponse) : -1
 
-  const handleSelect = (idx: number) => {
+  const handleSelect = async (idx: number) => {
     if (selected !== null) return
     setSelected(idx)
-    if (idx === correctIndex) setScore((s) => s + 1)
+    const isCorrect = idx === correctIndex
+    if (isCorrect) setScore((s) => s + 1)
+
+    if (!user || !q) return
+    try {
+      const { data: existing } = await supabase
+        .from("user_progress")
+        .select("id, tentatives")
+        .eq("user_id", user.id)
+        .eq("quiz_id", q.id)
+        .maybeSingle()
+
+      const payload = {
+        correct: isCorrect,
+        tentatives: (existing?.tentatives ?? 0) + 1,
+        last_reviewed: new Date().toISOString(),
+      }
+
+      if (existing) {
+        await supabase.from("user_progress").update(payload).eq("id", existing.id)
+      } else {
+        await supabase
+          .from("user_progress")
+          .insert({ user_id: user.id, quiz_id: q.id, ...payload })
+      }
+    } catch {
+      // Non-blocking: the quiz session continues even if logging fails
+    }
   }
 
   const handleNext = () => {

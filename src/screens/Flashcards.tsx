@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { ChevronLeft, RotateCcw, BookOpen, Loader2 } from "lucide-react"
 import { supabase } from "../lib/supabase/client"
+import { useAuth } from "../lib/supabase/auth"
 
 type Rating = "again" | "hard" | "good" | "easy"
 
@@ -31,6 +32,7 @@ const ratings: {
 ]
 
 export default function Flashcards({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [cards, setCards] = useState<Flashcard[]>([])
@@ -94,6 +96,42 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
   const handleRate = (r: Rating) => {
     const next = [...history, r]
     setHistory(next)
+
+    const niveauMap: Record<Rating, "nouveau" | "difficile" | "bien" | "facile"> = {
+      again: "nouveau",
+      hard: "difficile",
+      good: "bien",
+      easy: "facile",
+    }
+
+    if (user && card) {
+      void (async () => {
+        try {
+          const { data: existing } = await supabase
+            .from("flashcard_progress")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("flashcard_id", card.id)
+            .maybeSingle()
+
+          const payload = {
+            niveau: niveauMap[r],
+            last_reviewed: new Date().toISOString(),
+          }
+
+          if (existing) {
+            await supabase.from("flashcard_progress").update(payload).eq("id", existing.id)
+          } else {
+            await supabase
+              .from("flashcard_progress")
+              .insert({ user_id: user.id, flashcard_id: card.id, ...payload })
+          }
+        } catch {
+          // Non-blocking: the review session continues even if logging fails
+        }
+      })()
+    }
+
     if (current + 1 >= total) {
       setDone(true)
     } else {
