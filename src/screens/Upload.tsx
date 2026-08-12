@@ -75,14 +75,15 @@ export default function Upload({ onBack }: { onBack: () => void }) {
     fetchRecentCourses()
   }
 
-  const handleUpload = useCallback(async (file: File) => {
-    if (!titre.trim()) {
+  const handleUpload = useCallback(async (file: File, title: string) => {
+    if (!title.trim()) {
       setErrorMessage("Please enter a course title before uploading.")
       setState("error")
       return
     }
 
     setFilename(file.name)
+    setTitre(title.trim())
     setState("processing")
     setProgress(0)
     setErrorMessage("")
@@ -132,7 +133,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       setErrorMessage((err as Error).message)
       setState("error")
     }
-  }, [titre])
+  }, [])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -140,10 +141,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       const file = e.dataTransfer.files[0]
       if (file) {
         fileRef.current = file
-        if (!titre.trim()) {
-          setTitre(file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "))
-        }
-        handleUpload(file)
+        const title =
+          titre.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
+        handleUpload(file, title)
       }
     },
     [handleUpload, titre]
@@ -293,10 +293,10 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 const f = e.target.files?.[0]
                 if (f) {
                   fileRef.current = f
-                  if (!titre.trim()) {
-                    setTitre(f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "))
-                  }
-                  handleUpload(f)
+                  const title =
+                    titre.trim() ||
+                    f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
+                  handleUpload(f, title)
                 }
               }}
             />
