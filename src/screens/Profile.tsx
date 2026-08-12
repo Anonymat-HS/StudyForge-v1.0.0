@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { Camera, Flame, Brain, Target, TrendingUp, BookOpen, Upload, ArrowLeft } from "lucide-react"
 import { supabase } from "../lib/supabase/client"
 import { useAuth } from "../lib/supabase/auth"
+import { computeStreak } from "../lib/progress"
 import type { Screen } from "../App"
 
 interface CourseRow {
@@ -31,31 +32,6 @@ interface CourseStat {
 }
 
 const courseColors = ["#7C5CFF", "#00D9FF", "#F59E0B", "#22C55E", "#EC4899", "#F97316"]
-
-function computeStreak(quizRows: UserProgressRow[], flashRows: FlashcardProgressRow[]): number {
-  const days = new Set<string>()
-  for (const r of quizRows) {
-    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
-  }
-  for (const r of flashRows) {
-    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
-  }
-  if (!days.size) return 0
-
-  let streak = 0
-  const now = new Date()
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(now)
-    d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    if (days.has(key)) {
-      streak++
-    } else if (i > 0) {
-      break
-    }
-  }
-  return streak
-}
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)

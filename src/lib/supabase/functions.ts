@@ -14,12 +14,18 @@ export async function fetchWithRetry(
       const errMsg: string = body.error || ""
       const match = errMsg.match(/try again in ([\d.]+)s/)
       const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 40
-      setRetrying(`${label} — rate limit, retrying in ${waitSec}s...`)
-      await new Promise((r) => setTimeout(r, waitSec * 1000))
-      setRetrying(null)
+
+      if (attempt === MAX_RETRIES - 1) {
+        setRetrying(`${label} — rate limit exceeded, try again later.`)
+      } else {
+        setRetrying(`${label} — rate limit, retrying in ${waitSec}s...`)
+        await new Promise((r) => setTimeout(r, waitSec * 1000))
+        setRetrying(null)
+      }
       continue
     }
     const json = await res.json()
+    setRetrying(null)
     if (!res.ok) throw new Error(json.error || `${label} failed`)
     return json
   }

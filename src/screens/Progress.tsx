@@ -13,6 +13,7 @@ import { Flame, Target, Brain, TrendingUp } from "lucide-react"
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase/client"
 import { useAuth } from "../lib/supabase/auth"
+import { computeStreak } from "../lib/progress"
 
 interface CourseRow {
   id: string
@@ -112,31 +113,6 @@ const BarTooltip = ({
     )
   }
   return null
-}
-
-function computeStreak(quizRows: UserProgressRow[], flashRows: FlashcardProgressRow[]): number {
-  const days = new Set<string>()
-  for (const r of quizRows) {
-    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
-  }
-  for (const r of flashRows) {
-    days.add(new Date(r.last_reviewed).toISOString().slice(0, 10))
-  }
-  if (!days.size) return 0
-
-  let streak = 0
-  const now = new Date()
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(now)
-    d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    if (days.has(key)) {
-      streak++
-    } else if (i > 0) {
-      break
-    }
-  }
-  return streak
 }
 
 function computeScoreHistory(progressRows: UserProgressRow[]) {
@@ -566,25 +542,27 @@ export default function Progress() {
         >
           <h2 className="font-bold text-white mb-5">Weekly Activity</h2>
           <div className="overflow-x-auto pb-2 -mx-2 px-2">
-            <div className="flex gap-1 flex-wrap">
-              {weeklyActivity.weeks.map((week, wi) =>
-                week.map((count, di) => {
-                  const opacity =
-                    count >= 8 ? 0.9 :
-                    count >= 5 ? 0.65 :
-                    count >= 2 ? 0.4 :
-                    count >= 1 ? 0.22 :
-                    0.07
-                  return (
-                    <div
-                      key={`${wi}-${di}`}
-                      className="w-3 h-3 rounded-sm"
-                      style={{ background: `rgba(124,92,255,${opacity})` }}
-                      title={`${count} quizzes`}
-                    />
-                  )
-                })
-              )}
+            <div className="flex gap-1">
+              {weeklyActivity.weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-1">
+                  {week.map((count, di) => {
+                    const opacity =
+                      count >= 8 ? 0.9 :
+                      count >= 5 ? 0.65 :
+                      count >= 2 ? 0.4 :
+                      count >= 1 ? 0.22 :
+                      0.07
+                    return (
+                      <div
+                        key={di}
+                        className="w-3 h-3 rounded-sm"
+                        style={{ background: `rgba(124,92,255,${opacity})` }}
+                        title={`${count} quiz ${count !== 1 ? "s" : ""}`}
+                      />
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-2 mt-3">
