@@ -82,6 +82,18 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       return
     }
 
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMessage("File exceeds the 50 MB limit.")
+      setState("error")
+      return
+    }
+
+    if (!/\.(pdf|txt|md)$/i.test(file.name)) {
+      setErrorMessage("Unsupported file type. Please upload a PDF, TXT, or MD file.")
+      setState("error")
+      return
+    }
+
     setFilename(file.name)
     setTitre(title.trim())
     setState("processing")
@@ -100,6 +112,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       formData.append("file", file)
       formData.append("titre", titre.trim())
 
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 120_000)
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
 
@@ -112,11 +127,13 @@ export default function Upload({ onBack }: { onBack: () => void }) {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: formData,
+        signal: controller.signal,
       })
 
       const json = await res.json()
 
       clearInterval(interval)
+      clearTimeout(timeout)
 
       if (!res.ok) {
         throw new Error(json.error || "Upload failed")
@@ -130,7 +147,11 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       await generateContent(courseId)
     } catch (err) {
       clearInterval(interval)
-      setErrorMessage((err as Error).message)
+      setErrorMessage(
+        (err as Error).name === "AbortError"
+          ? "Upload timed out. Please try again."
+          : (err as Error).message
+      )
       setState("error")
     }
   }, [])
