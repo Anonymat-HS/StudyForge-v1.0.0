@@ -43,21 +43,26 @@ export default function Dashboard({
     )
     if (!coursesData) return
 
-    const coursesWithStats = await Promise.all(
-      coursesData.map(async (course) => {
-        const quizzes = await query(() =>
-          supabase.from("quizzes").select("id", { count: "exact", head: true }).eq("course_id", course.id)
-        )
-        const flashcards = await query(() =>
-          supabase.from("flashcards").select("id", { count: "exact", head: true }).eq("course_id", course.id)
-        )
-        return {
-          ...course,
-          quiz_count: quizzes?.count ?? 0,
-          flashcard_count: flashcards?.count ?? 0,
-        }
-      })
-    )
+    const courseIds = coursesData.map((c) => c.id)
+    const [quizzesRes, flashcardsRes] = await Promise.all([
+      query(() =>
+        supabase.from("quizzes").select("course_id").in("course_id", courseIds)
+      ),
+      query(() =>
+        supabase.from("flashcards").select("course_id").in("course_id", courseIds)
+      ),
+    ])
+
+    const quizCounts: Record<string, number> = {}
+    for (const q of quizzesRes ?? []) quizCounts[q.course_id] = (quizCounts[q.course_id] ?? 0) + 1
+    const flashCounts: Record<string, number> = {}
+    for (const f of flashcardsRes ?? []) flashCounts[f.course_id] = (flashCounts[f.course_id] ?? 0) + 1
+
+    const coursesWithStats = coursesData.map((course) => ({
+      ...course,
+      quiz_count: quizCounts[course.id] ?? 0,
+      flashcard_count: flashCounts[course.id] ?? 0,
+    }))
 
     setCourses(coursesWithStats)
   }
