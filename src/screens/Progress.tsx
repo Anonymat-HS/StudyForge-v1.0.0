@@ -217,7 +217,6 @@ export default function Progress() {
         flashByCourse[f.course_id].push(f)
       }
 
-      const quizIdsSet = new Set(allQuizzes.map((q) => q.id))
       const progressByQuiz: Record<string, boolean> = {}
       for (const p of progressRows) {
         if (p.correct !== null) {

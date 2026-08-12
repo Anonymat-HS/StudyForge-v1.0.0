@@ -3,7 +3,6 @@ import { Camera, Flame, Brain, Target, TrendingUp, BookOpen, Upload, ArrowLeft }
 import { supabase } from "../lib/supabase/client"
 import { useAuth } from "../lib/supabase/auth"
 import { computeStreak } from "../lib/progress"
-import type { Screen } from "../App"
 
 interface CourseRow {
   id: string

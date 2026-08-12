@@ -1,4 +1,4 @@
-import { Upload, Brain, CreditCard, Clock, Flame, ArrowRight, Quote, BookOpen, AlertCircle, RefreshCw } from "lucide-react"
+import { Upload, Brain, CreditCard, Flame, ArrowRight, Quote, BookOpen, AlertCircle, RefreshCw } from "lucide-react"
 import { getRandomQuote } from "../data/quotes"
 import type { Screen } from "../App"
 import { useState, useEffect } from "react"

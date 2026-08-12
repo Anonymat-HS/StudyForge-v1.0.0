@@ -22,17 +22,13 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   const [titre, setTitre] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
   const [recentCourses, setRecentCourses] = useState<Course[]>([])
-  const [generatedCourseId, setGeneratedCourseId] = useState<string | null>(null)
   const [quizError, setQuizError] = useState<string | null>(null)
   const [flashcardError, setFlashcardError] = useState<string | null>(null)
   const [retryingMsg, setRetryingMsg] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const fileRef = useRef<File | null>(null)
 
   useEffect(() => {
-    let ignore = false
     fetchRecentCourses()
-    return () => { ignore = true }
   }, [])
 
   const fetchRecentCourses = async () => {
@@ -45,7 +41,6 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   }
 
   const generateContent = async (courseId: string) => {
-    setGeneratedCourseId(courseId)
     setState("generating")
     setQuizError(null)
     setFlashcardError(null)
@@ -161,7 +156,6 @@ export default function Upload({ onBack }: { onBack: () => void }) {
       e.preventDefault()
       const file = e.dataTransfer.files[0]
       if (file) {
-        fileRef.current = file
         const title =
           titre.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
         handleUpload(file, title)
@@ -313,7 +307,6 @@ export default function Upload({ onBack }: { onBack: () => void }) {
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) {
-                  fileRef.current = f
                   const title =
                     titre.trim() ||
                     f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
@@ -583,11 +576,9 @@ export default function Upload({ onBack }: { onBack: () => void }) {
                 setProgress(0)
                 setFilename("")
                 setTitre("")
-                setGeneratedCourseId(null)
                 setQuizError(null)
                 setFlashcardError(null)
                 setRetryingMsg(null)
-                fileRef.current = null
               }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
               style={{
