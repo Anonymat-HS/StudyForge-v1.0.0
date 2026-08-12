@@ -7,7 +7,7 @@ import {
   Settings,
   X,
 } from "lucide-react"
-import type { Screen } from "../App"
+import type { Screen } from "@/App"
 
 interface SidebarProps {
   screen: Screen

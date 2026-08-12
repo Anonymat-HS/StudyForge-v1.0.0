@@ -1,26 +1,22 @@
 import { useState, useEffect } from "react"
 import { ChevronLeft, CheckCircle, XCircle, ArrowRight, RotateCcw, BookOpen, Loader2 } from "lucide-react"
-import { supabase } from "../lib/supabase/client"
-import { useAuth } from "../lib/supabase/auth"
+import { useAuth } from "@/lib/supabase/auth"
+import {
+  fetchCourses,
+  fetchQuizCountsByCourses,
+  fetchQuestionsForCourse,
+  recordQuizAnswer,
+} from "@/lib/api"
+import type { Course, QuizQuestion } from "@/lib/types"
 
-interface Course {
-  id: string
-  titre: string
+interface CourseWithCount extends Course {
   quiz_count: number
-}
-
-interface QuizQuestion {
-  id: string
-  question: string
-  options: string[]
-  bonne_reponse: string
-  explication: string | null
 }
 
 export default function Quiz({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
-  const [courses, setCourses] = useState<Course[]>([])
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+  const [courses, setCourses] = useState<CourseWithCount[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<CourseWithCount | null>(null)
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingQuiz, setLoadingQuiz] = useState(false)
@@ -31,44 +27,22 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
   const [finished, setFinished] = useState(false)
 
   useEffect(() => {
-    async function fetchCourses() {
-      const { data } = await supabase
-        .from("courses")
-        .select("id, titre")
-        .order("created_at", { ascending: false })
-
-      if (!data) {
-        setLoading(false)
-        return
-      }
-
-      const coursesWithCount = await Promise.all(
-        data.map(async (c) => {
-          const { count } = await supabase
-            .from("quizzes")
-            .select("id", { count: "exact", head: true })
-            .eq("course_id", c.id)
-          return { ...c, quiz_count: count ?? 0 }
-        })
-      )
-
-      setCourses(coursesWithCount)
+    async function fetchCourseList() {
+      const coursesData = await fetchCourses()
+      const counts = await fetchQuizCountsByCourses(coursesData.map((c) => c.id))
+      setCourses(coursesData.map((c) => ({ ...c, quiz_count: counts[c.id] ?? 0 })))
       setLoading(false)
     }
-    fetchCourses()
+    fetchCourseList()
   }, [])
 
-  const startQuiz = async (course: Course) => {
+  const startQuiz = async (course: CourseWithCount) => {
     setSelectedCourse(course)
     setLoadingQuiz(true)
 
-    const { data } = await supabase
-      .from("quizzes")
-      .select("id, question, options, bonne_reponse, explication")
-      .eq("course_id", course.id)
-      .order("created_at", { ascending: true })
+    const data = await fetchQuestionsForCourse(course.id)
 
-    setQuestions(data ?? [])
+    setQuestions(data)
     setLoadingQuiz(false)
     setCurrent(0)
     setScore(0)
@@ -97,30 +71,7 @@ export default function Quiz({ onBack }: { onBack: () => void }) {
     if (isCorrect) setScore((s) => s + 1)
 
     if (!user || !q) return
-    try {
-      const { data: existing } = await supabase
-        .from("user_progress")
-        .select("id, tentatives")
-        .eq("user_id", user.id)
-        .eq("quiz_id", q.id)
-        .maybeSingle()
-
-      const payload = {
-        correct: isCorrect,
-        tentatives: (existing?.tentatives ?? 0) + 1,
-        last_reviewed: new Date().toISOString(),
-      }
-
-      if (existing) {
-        await supabase.from("user_progress").update(payload).eq("id", existing.id)
-      } else {
-        await supabase
-          .from("user_progress")
-          .insert({ user_id: user.id, quiz_id: q.id, ...payload })
-      }
-    } catch {
-      // Non-blocking: the quiz session continues even if logging fails
-    }
+    await recordQuizAnswer(user.id, q.id, isCorrect)
   }
 
   const handleNext = () => {

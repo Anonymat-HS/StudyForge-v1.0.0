@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { User, Settings, LogOut } from "lucide-react"
-import { useAuth } from "../lib/supabase/auth"
-import type { Screen } from "../App"
+import { useAuth } from "@/lib/supabase/auth"
+import type { Screen } from "@/App"
 
 interface AvatarMenuProps {
   onNavigate: (screen: Screen) => void

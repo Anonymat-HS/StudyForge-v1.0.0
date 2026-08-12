@@ -6,6 +6,14 @@ export interface Course {
   created_at: string;
 }
 
+export interface CourseWithCounts {
+  id: string;
+  titre: string;
+  created_at: string;
+  quiz_count: number;
+  flashcard_count: number;
+}
+
 export interface QuizItem {
   id: string;
   course_id: string;
@@ -16,6 +24,11 @@ export interface QuizItem {
   created_at: string;
 }
 
+export type QuizQuestion = Pick<
+  QuizItem,
+  "id" | "question" | "options" | "bonne_reponse" | "explication"
+>;
+
 export interface Flashcard {
   id: string;
   course_id: string;
@@ -23,6 +36,8 @@ export interface Flashcard {
   verso: string;
   created_at: string;
 }
+
+export type FlashcardReviewCard = Pick<Flashcard, "id" | "recto" | "verso">;
 
 export interface UserProgress {
   id: string;

@@ -1,24 +1,21 @@
 import { useState, useEffect } from "react"
 import { ChevronLeft, RotateCcw, BookOpen, Loader2 } from "lucide-react"
-import { supabase } from "../lib/supabase/client"
-import { useAuth } from "../lib/supabase/auth"
+import { useAuth } from "@/lib/supabase/auth"
+import {
+  fetchCourses,
+  fetchFlashcardCountsByCourses,
+  fetchCardsForCourse,
+  recordFlashcardRating,
+  type FlashcardRating,
+} from "@/lib/api"
+import type { Course, FlashcardReviewCard } from "@/lib/types"
 
-type Rating = "again" | "hard" | "good" | "easy"
-
-interface Course {
-  id: string
-  titre: string
+interface CourseWithCount extends Course {
   flashcard_count: number
 }
 
-interface Flashcard {
-  id: string
-  recto: string
-  verso: string
-}
-
 const ratings: {
-  r: Rating
+  r: FlashcardRating
   label: string
   color: string
   bg: string
@@ -33,56 +30,34 @@ const ratings: {
 
 export default function Flashcards({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
-  const [courses, setCourses] = useState<Course[]>([])
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
-  const [cards, setCards] = useState<Flashcard[]>([])
+  const [courses, setCourses] = useState<CourseWithCount[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<CourseWithCount | null>(null)
+  const [cards, setCards] = useState<FlashcardReviewCard[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingCards, setLoadingCards] = useState(false)
 
   const [current, setCurrent] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done, setDone] = useState(false)
-  const [history, setHistory] = useState<Rating[]>([])
+  const [history, setHistory] = useState<FlashcardRating[]>([])
 
   useEffect(() => {
-    async function fetchCourses() {
-      const { data } = await supabase
-        .from("courses")
-        .select("id, titre")
-        .order("created_at", { ascending: false })
-
-      if (!data) {
-        setLoading(false)
-        return
-      }
-
-      const coursesWithCount = await Promise.all(
-        data.map(async (c) => {
-          const { count } = await supabase
-            .from("flashcards")
-            .select("id", { count: "exact", head: true })
-            .eq("course_id", c.id)
-          return { ...c, flashcard_count: count ?? 0 }
-        })
-      )
-
-      setCourses(coursesWithCount)
+    async function fetchCourseList() {
+      const coursesData = await fetchCourses()
+      const counts = await fetchFlashcardCountsByCourses(coursesData.map((c) => c.id))
+      setCourses(coursesData.map((c) => ({ ...c, flashcard_count: counts[c.id] ?? 0 })))
       setLoading(false)
     }
-    fetchCourses()
+    fetchCourseList()
   }, [])
 
-  const startReview = async (course: Course) => {
+  const startReview = async (course: CourseWithCount) => {
     setSelectedCourse(course)
     setLoadingCards(true)
 
-    const { data } = await supabase
-      .from("flashcards")
-      .select("id, recto, verso")
-      .eq("course_id", course.id)
-      .order("created_at", { ascending: true })
+    const data = await fetchCardsForCourse(course.id)
 
-    setCards(data ?? [])
+    setCards(data)
     setLoadingCards(false)
     setCurrent(0)
     setFlipped(false)
@@ -93,43 +68,12 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
   const card = cards[current]
   const total = cards.length
 
-  const handleRate = (r: Rating) => {
+  const handleRate = (r: FlashcardRating) => {
     const next = [...history, r]
     setHistory(next)
 
-    const niveauMap: Record<Rating, "nouveau" | "difficile" | "bien" | "facile"> = {
-      again: "nouveau",
-      hard: "difficile",
-      good: "bien",
-      easy: "facile",
-    }
-
     if (user && card) {
-      void (async () => {
-        try {
-          const { data: existing } = await supabase
-            .from("flashcard_progress")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("flashcard_id", card.id)
-            .maybeSingle()
-
-          const payload = {
-            niveau: niveauMap[r],
-            last_reviewed: new Date().toISOString(),
-          }
-
-          if (existing) {
-            await supabase.from("flashcard_progress").update(payload).eq("id", existing.id)
-          } else {
-            await supabase
-              .from("flashcard_progress")
-              .insert({ user_id: user.id, flashcard_id: card.id, ...payload })
-          }
-        } catch {
-          // Non-blocking: the review session continues even if logging fails
-        }
-      })()
+      void recordFlashcardRating(user.id, card.id, r)
     }
 
     if (current + 1 >= total) {
@@ -294,7 +238,7 @@ export default function Flashcards({ onBack }: { onBack: () => void }) {
 
   // Done
   if (done) {
-    const counts = { again: 0, hard: 0, good: 0, easy: 0 } as Record<Rating, number>
+    const counts = { again: 0, hard: 0, good: 0, easy: 0 } as Record<FlashcardRating, number>
     history.forEach((r) => counts[r]++)
 
     return (

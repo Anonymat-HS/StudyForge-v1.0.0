@@ -1,36 +1,8 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import { Camera, Flame, Brain, Target, TrendingUp, BookOpen, Upload, ArrowLeft } from "lucide-react"
-import { supabase } from "../lib/supabase/client"
-import { useAuth } from "../lib/supabase/auth"
-import { computeStreak } from "../lib/progress"
-
-interface CourseRow {
-  id: string
-  titre: string
-  created_at: string
-}
-
-interface UserProgressRow {
-  quiz_id: string
-  correct: boolean | null
-  last_reviewed: string
-}
-
-interface FlashcardProgressRow {
-  niveau: string
-  last_reviewed: string
-}
-
-interface CourseStat {
-  id: string
-  title: string
-  color: string
-  quizCount: number
-  correctCount: number
-  progress: number
-}
-
-const courseColors = ["#7C5CFF", "#00D9FF", "#F59E0B", "#22C55E", "#EC4899", "#F97316"]
+import { supabase } from "@/lib/supabase/client"
+import { useAuth } from "@/lib/supabase/auth"
+import { useUserStats } from "@/hooks/useUserStats"
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
@@ -57,13 +29,12 @@ export default function Profile({ onBack }: { onBack: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
-  const [loading, setLoading] = useState(true)
-  const [courseCount, setCourseCount] = useState(0)
-  const [quizCount, setQuizCount] = useState(0)
-  const [flashcardCount, setFlashcardCount] = useState(0)
-  const [streak, setStreak] = useState(0)
-  const [avgScore, setAvgScore] = useState(0)
-  const [courseStats, setCourseStats] = useState<CourseStat[]>([])
+  const { loading, courses, progressRows, flashcardsReviewed, streak, avgScore, breakdown } = useUserStats(user?.id)
+
+  const courseCount = courses.length
+  const quizCount = progressRows.length
+  const flashcardCount = flashcardsReviewed
+  const courseStats = breakdown
 
   const name = user?.user_metadata?.full_name ?? user?.email ?? ""
   const email = user?.email ?? ""
@@ -71,73 +42,6 @@ export default function Profile({ onBack }: { onBack: () => void }) {
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
   const initials = getInitials(name)
   const bgGradient = getAvatarColor(name)
-
-  useEffect(() => {
-    if (!user) return
-    async function fetchData() {
-      const [coursesRes, progressRes, flashcardProgressRes] = await Promise.all([
-        supabase.from("courses").select("id, titre, created_at").eq("user_id", user!.id),
-        supabase.from("user_progress").select("quiz_id, correct, last_reviewed").eq("user_id", user!.id),
-        supabase.from("flashcard_progress").select("niveau, last_reviewed").eq("user_id", user!.id),
-      ])
-
-      const coursesList = (coursesRes.data ?? []) as CourseRow[]
-      const progressRows = (progressRes.data ?? []) as UserProgressRow[]
-      const flashProgRows = (flashcardProgressRes.data ?? []) as FlashcardProgressRow[]
-
-      setCourseCount(coursesList.length)
-      setQuizCount(progressRows.length)
-      setFlashcardCount(flashProgRows.length)
-      setStreak(computeStreak(progressRows, flashProgRows))
-
-      const answered = progressRows.filter((r) => r.correct !== null)
-      const correct = answered.filter((r) => r.correct).length
-      setAvgScore(answered.length ? Math.round((correct / answered.length) * 100) : 0)
-
-      // Per-course breakdown
-      const courseIds = coursesList.map((c) => c.id)
-      let allQuizzes: { id: string; course_id: string }[] = []
-      if (courseIds.length) {
-        const { data } = await supabase
-          .from("quizzes")
-          .select("id, course_id")
-          .in("course_id", courseIds)
-        allQuizzes = (data ?? []) as { id: string; course_id: string }[]
-      }
-
-      const quizByCourse: Record<string, { id: string }[]> = {}
-      for (const q of allQuizzes) {
-        if (!quizByCourse[q.course_id]) quizByCourse[q.course_id] = []
-        quizByCourse[q.course_id].push(q)
-      }
-
-      const allQuizIds = new Set(allQuizzes.map((q) => q.id))
-      const lastCorrect: Record<string, boolean> = {}
-      for (const p of progressRows) {
-        if (p.correct !== null) {
-          lastCorrect[p.quiz_id] = p.correct
-        }
-      }
-
-      setCourseStats(
-        coursesList.map((c, i) => {
-          const cQuizzes = (quizByCourse[c.id] || []).filter((q) => allQuizIds.has(q.id))
-          const correctCount = cQuizzes.filter((q) => lastCorrect[q.id] === true).length
-          return {
-            id: c.id,
-            title: c.titre,
-            color: courseColors[i % courseColors.length],
-            quizCount: cQuizzes.length,
-            correctCount,
-            progress: cQuizzes.length ? Math.round((correctCount / cQuizzes.length) * 100) : 0,
-          }
-        })
-      )
-
-      setLoading(false)
-    }
-    fetchData()
-  }, [user])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { useAuth } from "../lib/supabase/auth"
-import { supabase } from "../lib/supabase/client"
+import { useAuth } from "@/lib/supabase/auth"
+import { supabase } from "@/lib/supabase/client"
 
 export default function CompleteProfile({
   onComplete,

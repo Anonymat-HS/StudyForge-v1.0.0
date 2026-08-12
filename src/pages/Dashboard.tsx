@@ -1,18 +1,11 @@
 import { Upload, Brain, CreditCard, Flame, ArrowRight, Quote, BookOpen, AlertCircle, RefreshCw } from "lucide-react"
-import { getRandomQuote } from "../data/quotes"
-import type { Screen } from "../App"
+import { getRandomQuote } from "@/lib/utils/quotes"
+import type { Screen } from "@/App"
 import { useState, useEffect } from "react"
-import { supabase } from "../lib/supabase/client"
-import { useAuth } from "../lib/supabase/auth"
-import { callGenerateFunction } from "../lib/supabase/functions"
-
-interface CourseWithStats {
-  id: string
-  titre: string
-  created_at: string
-  quiz_count: number
-  flashcard_count: number
-}
+import { useAuth } from "@/lib/supabase/auth"
+import { callGenerateFunction } from "@/lib/supabase/functions"
+import { fetchCourses, fetchQuizCountsByCourses, fetchFlashcardCountsByCourses } from "@/lib/api"
+import type { CourseWithCounts } from "@/lib/types"
 
 export default function Dashboard({
   onNavigate,
@@ -21,7 +14,7 @@ export default function Dashboard({
 }) {
   const { user } = useAuth()
   const [quote] = useState(() => getRandomQuote())
-  const [courses, setCourses] = useState<CourseWithStats[]>([])
+  const [courses, setCourses] = useState<CourseWithCounts[]>([])
   const [loading, setLoading] = useState(true)
   const [retryingCourse, setRetryingCourse] = useState<{ id: string; type: "quiz" | "flashcard" } | null>(null)
   const [retryError, setRetryError] = useState<string | null>(null)
@@ -29,36 +22,14 @@ export default function Dashboard({
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there"
 
   const loadCourses = async () => {
-    async function query<T>(fn: () => Promise<{ data: T | null; error: unknown }>): Promise<T | null> {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { data, error } = await fn()
-        if (!error) return data
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)))
-      }
-      return null
-    }
-
-    const coursesData = await query(() =>
-      supabase.from("courses").select("id, titre, created_at").order("created_at", { ascending: false })
-    )
-    if (!coursesData) return
-
+    const coursesData = await fetchCourses()
     const courseIds = coursesData.map((c) => c.id)
-    const [quizzesRes, flashcardsRes] = await Promise.all([
-      query(() =>
-        supabase.from("quizzes").select("course_id").in("course_id", courseIds)
-      ),
-      query(() =>
-        supabase.from("flashcards").select("course_id").in("course_id", courseIds)
-      ),
+    const [quizCounts, flashCounts] = await Promise.all([
+      fetchQuizCountsByCourses(courseIds),
+      fetchFlashcardCountsByCourses(courseIds),
     ])
 
-    const quizCounts: Record<string, number> = {}
-    for (const q of quizzesRes ?? []) quizCounts[q.course_id] = (quizCounts[q.course_id] ?? 0) + 1
-    const flashCounts: Record<string, number> = {}
-    for (const f of flashcardsRes ?? []) flashCounts[f.course_id] = (flashCounts[f.course_id] ?? 0) + 1
-
-    const coursesWithStats = coursesData.map((course) => ({
+    const coursesWithStats: CourseWithCounts[] = coursesData.map((course) => ({
       ...course,
       quiz_count: quizCounts[course.id] ?? 0,
       flashcard_count: flashCounts[course.id] ?? 0,

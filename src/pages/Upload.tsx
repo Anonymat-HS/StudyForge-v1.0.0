@@ -9,9 +9,10 @@ import {
   Brain,
   CreditCard,
 } from "lucide-react"
-import { supabase } from "../lib/supabase/client"
-import { callGenerateFunction } from "../lib/supabase/functions"
-import type { Course } from "../lib/types"
+import { supabase } from "@/lib/supabase/client"
+import { callGenerateFunction } from "@/lib/supabase/functions"
+import { fetchRecentCourses } from "@/lib/api"
+import type { Course } from "@/lib/types"
 
 type UploadState = "idle" | "dragover" | "processing" | "generating" | "done" | "error"
 
@@ -28,17 +29,8 @@ export default function Upload({ onBack }: { onBack: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchRecentCourses()
+    fetchRecentCourses().then(setRecentCourses)
   }, [])
-
-  const fetchRecentCourses = async () => {
-    const { data } = await supabase
-      .from("courses")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(5)
-    if (data) setRecentCourses(data)
-  }
 
   const generateContent = async (courseId: string) => {
     setState("generating")
@@ -67,7 +59,7 @@ export default function Upload({ onBack }: { onBack: () => void }) {
 
     setRetryingMsg(null)
     setState("done")
-    fetchRecentCourses()
+    fetchRecentCourses().then(setRecentCourses)
   }
 
   const handleUpload = useCallback(async (file: File, title: string) => {

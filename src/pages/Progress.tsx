@@ -10,52 +10,10 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { Flame, Target, Brain, TrendingUp } from "lucide-react"
-import { useState, useEffect } from "react"
-import { supabase } from "../lib/supabase/client"
-import { useAuth } from "../lib/supabase/auth"
-import { computeStreak } from "../lib/progress"
-
-interface CourseRow {
-  id: string
-  titre: string
-  created_at: string
-}
-
-interface QuizRow {
-  id: string
-  course_id: string
-}
-
-interface FlashcardRow {
-  id: string
-  course_id: string
-}
-
-interface UserProgressRow {
-  id: string
-  quiz_id: string
-  correct: boolean | null
-  last_reviewed: string
-}
-
-interface FlashcardProgressRow {
-  id: string
-  flashcard_id: string
-  niveau: string
-  last_reviewed: string
-}
-
-interface CourseStat {
-  id: string
-  title: string
-  color: string
-  quizCount: number
-  flashcardCount: number
-  correctCount: number
-  progress: number
-}
-
-const courseColors = ["#7C5CFF", "#00D9FF", "#F59E0B", "#22C55E", "#EC4899", "#F97316"]
+import { useMemo } from "react"
+import { useAuth } from "@/lib/supabase/auth"
+import { useUserStats } from "@/hooks/useUserStats"
+import type { UserProgress } from "@/lib/types"
 
 const CustomTooltip = ({
   active,
@@ -115,7 +73,7 @@ const BarTooltip = ({
   return null
 }
 
-function computeScoreHistory(progressRows: UserProgressRow[]) {
+function computeScoreHistory(progressRows: UserProgress[]) {
   const answered = progressRows.filter((r) => r.correct !== null)
   const byDate: Record<string, { correct: number; total: number }> = {}
   for (const row of answered) {
@@ -133,7 +91,7 @@ function computeScoreHistory(progressRows: UserProgressRow[]) {
   }))
 }
 
-function computeWeeklyActivity(progressRows: UserProgressRow[]) {
+function computeWeeklyActivity(progressRows: UserProgress[]) {
   const days: Record<string, number> = {}
   for (const row of progressRows) {
     const day = new Date(row.last_reviewed).toISOString().slice(0, 10)
@@ -156,103 +114,28 @@ function computeWeeklyActivity(progressRows: UserProgressRow[]) {
 
 export default function Progress() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [quizzesTaken, setQuizzesTaken] = useState(0)
-  const [avgScore, setAvgScore] = useState(0)
-  const [streak, setStreak] = useState(0)
-  const [flashcardsReviewed, setFlashcardsReviewed] = useState(0)
-  const [scoreHistory, setScoreHistory] = useState<{ date: string; score: number }[]>([])
-  const [courseStats, setCourseStats] = useState<{ name: string; score: number }[]>([])
-  const [courseBreakdown, setCourseBreakdown] = useState<CourseStat[]>([])
-  const [weeklyActivity, setWeeklyActivity] = useState<{ weeks: number[][]; days: Record<string, number> }>({ weeks: [], days: {} })
+  const {
+    loading,
+    progressRows,
+    breakdown,
+    answeredCount: quizzesTaken,
+    avgScore,
+    streak,
+    flashcardsReviewed,
+  } = useUserStats(user?.id)
 
-  useEffect(() => {
-    if (!user) return
-    async function fetch() {
-      const [coursesRes, progressRes, flashcardProgressRes] = await Promise.all([
-        supabase.from("courses").select("id, titre, created_at").eq("user_id", user!.id),
-        supabase.from("user_progress").select("id, quiz_id, correct, last_reviewed").eq("user_id", user!.id),
-        supabase.from("flashcard_progress").select("id, flashcard_id, niveau, last_reviewed").eq("user_id", user!.id),
-      ])
-
-      const coursesList = (coursesRes.data || []) as CourseRow[]
-      const progressRows = (progressRes.data || []) as UserProgressRow[]
-      const flashcardProgRows = (flashcardProgressRes.data || []) as FlashcardProgressRow[]
-
-      const courseIds = coursesList.map((c) => c.id)
-      let allQuizzes: QuizRow[] = []
-      let allFlashcards: FlashcardRow[] = []
-      if (courseIds.length) {
-        const [quizzesRes, flashcardsRes] = await Promise.all([
-          supabase.from("quizzes").select("id, course_id").in("course_id", courseIds),
-          supabase.from("flashcards").select("id, course_id").in("course_id", courseIds),
-        ])
-        allQuizzes = (quizzesRes.data || []) as QuizRow[]
-        allFlashcards = (flashcardsRes.data || []) as FlashcardRow[]
-      }
-
-      // Stats (filter out null correct)
-      const answered = progressRows.filter((r) => r.correct !== null)
-      const totalTaken = answered.length
-      const totalCorrect = answered.filter((r) => r.correct).length
-      setQuizzesTaken(totalTaken)
-      setAvgScore(totalTaken ? Math.round((totalCorrect / totalTaken) * 100) : 0)
-      setStreak(computeStreak(progressRows, flashcardProgRows))
-
-      // Flashcards reviewed
-      setFlashcardsReviewed(flashcardProgRows.length)
-
-      // Score history
-      setScoreHistory(computeScoreHistory(progressRows))
-
-      // Course breakdown
-      const quizByCourse: Record<string, QuizRow[]> = {}
-      const flashByCourse: Record<string, FlashcardRow[]> = {}
-      for (const q of allQuizzes) {
-        if (!quizByCourse[q.course_id]) quizByCourse[q.course_id] = []
-        quizByCourse[q.course_id].push(q)
-      }
-      for (const f of allFlashcards) {
-        if (!flashByCourse[f.course_id]) flashByCourse[f.course_id] = []
-        flashByCourse[f.course_id].push(f)
-      }
-
-      const progressByQuiz: Record<string, boolean> = {}
-      for (const p of progressRows) {
-        if (p.correct !== null) {
-          progressByQuiz[p.quiz_id] = p.correct
-        }
-      }
-
-      const breakdown: CourseStat[] = coursesList.map((c, i) => {
-        const cQuizzes = quizByCourse[c.id] || []
-        const cFlashcards = flashByCourse[c.id] || []
-        const correct = cQuizzes.filter((q) => progressByQuiz[q.id] === true).length
-        const total = cQuizzes.length
-        return {
-          id: c.id,
-          title: c.titre,
-          color: courseColors[i % courseColors.length],
-          quizCount: total,
-          flashcardCount: cFlashcards.length,
-          correctCount: correct,
-          progress: total ? Math.round((correct / total) * 100) : 0,
-        }
-      })
-      setCourseBreakdown(breakdown)
-
-      setCourseStats(
-        breakdown
-          .filter((c) => c.quizCount > 0)
-          .map((c) => ({ name: c.title.length > 12 ? c.title.slice(0, 12) + "…" : c.title, score: c.progress }))
-      )
-
-      setWeeklyActivity(computeWeeklyActivity(progressRows))
-
-      setLoading(false)
-    }
-    fetch()
-  }, [user])
+  const scoreHistory = useMemo(() => computeScoreHistory(progressRows), [progressRows])
+  const weeklyActivity = useMemo(() => computeWeeklyActivity(progressRows), [progressRows])
+  const courseStats = useMemo(
+    () =>
+      breakdown
+        .filter((c) => c.quizCount > 0)
+        .map((c) => ({
+          name: c.title.length > 12 ? c.title.slice(0, 12) + "…" : c.title,
+          score: c.progress,
+        })),
+    [breakdown]
+  )
 
   const hasData = quizzesTaken > 0 || flashcardsReviewed > 0
 
@@ -477,13 +360,13 @@ export default function Progress() {
           }}
         >
           <h2 className="font-bold text-white mb-5">Course Breakdown</h2>
-          {courseBreakdown.length === 0 ? (
+          {breakdown.length === 0 ? (
             <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>
               No courses yet. Upload material to get started.
             </p>
           ) : (
             <div className="space-y-5">
-              {courseBreakdown.map((c) => (
+              {breakdown.map((c) => (
                 <div key={c.id}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
