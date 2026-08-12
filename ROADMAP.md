@@ -129,5 +129,6 @@
 ### Technique
 
 - [ ] **Types Supabase générés** (`supabase gen types`) pour remplacer les interfaces manuelles de `src/lib/types.ts`.
-- [ ] **Typecheck au workflow** : fournir les types `lucide-react` manquants et faire passer `tsc --noEmit`.
-- [ ] **Supprimer le code mort** : `src/data.ts` (mock data inutilisée), `fileRef`/`generatedCourseId` dans `Upload.tsx`.
+- [x] **Typecheck au workflow** : `tsc --noEmit` passe (déclaration `lucide-react` ajoutée, couche `lib/api` typée).
+- [x] **Supprimer le code mort** : `src/data.ts`, `fileRef`/`generatedCourseId` dans `Upload.tsx`.
+- [x] **Structure du projet** : dossiers `pages/`, `components/layout/`, `lib/api/` (couche d'accès typée), `lib/utils/`, `hooks/` — imports via l'alias `@/`.
